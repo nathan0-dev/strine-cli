@@ -5,13 +5,23 @@ import anthropic
 
 MODEL = "claude-sonnet-5"
 
-VALID_TOOLS = {"sql", "slack", "webhook"}
+VALID_TOOLS = {
+    "sql",
+    "slack",
+    "webhook",
+    "http_request",
+    "web_search",
+    "send_email",
+    "file_read",
+    "file_write",
+}
 
 SYSTEM_PROMPT = """Você é um "agent architect". Dado o pedido de um usuário em
 linguagem natural, decida como montar um agent de IA:
 
 1. Quais tools esse agent precisa, escolhendo apenas entre: "sql", "slack",
-   "webhook". Se nenhuma for necessária, retorne uma lista vazia.
+   "webhook", "http_request", "web_search", "send_email", "file_read",
+   "file_write". Se nenhuma for necessária, retorne uma lista vazia.
 2. Um system prompt claro e específico para o agent que vai ser criado,
    descrevendo seu papel, escopo e como deve se comportar.
 3. Um nome curto e descritivo em formato slug (minúsculas, hífens, sem
@@ -20,9 +30,16 @@ linguagem natural, decida como montar um agent de IA:
 Escolha uma tool apenas quando o pedido do usuário claramente precisar dela:
 - "sql": o agent precisa consultar um banco de dados.
 - "slack": o agent precisa postar mensagens no Slack.
-- "webhook": o agent precisa disparar uma chamada HTTP externa.
+- "webhook": o agent precisa disparar uma chamada HTTP simples (POST com payload fixo).
+- "http_request": o agent precisa chamar uma API HTTP externa de forma mais flexível (qualquer método, headers, auth).
+- "web_search": o agent precisa pesquisar informação atual na internet.
+- "send_email": o agent precisa enviar emails.
+- "file_read": o agent precisa ler arquivos locais.
+- "file_write": o agent precisa escrever/salvar arquivos locais.
 
-Não invente necessidade de tools que o usuário não pediu."""
+Prefira "http_request" a "webhook" para integrações novas, a menos que o
+pedido seja literalmente só um POST simples. Não invente necessidade de
+tools que o usuário não pediu."""
 
 AGENT_PLAN_TOOL = {
     "name": "create_agent_plan",
@@ -54,9 +71,15 @@ class AgentConfig:
     name: str
     prompt: str
     tools: List[str] = field(default_factory=list)
+    custom_tools: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {"name": self.name, "prompt": self.prompt, "tools": self.tools}
+        return {
+            "name": self.name,
+            "prompt": self.prompt,
+            "tools": self.tools,
+            "custom_tools": self.custom_tools,
+        }
 
 
 class PlannerError(RuntimeError):
