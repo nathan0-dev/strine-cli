@@ -143,3 +143,105 @@ def test_generate_custom_tool_accepts_valid_module_level_execute():
     assert isinstance(spec, CustomToolSpec)
     assert spec.name == "valid_tool"
     assert spec.code == "def execute(x):\n    return f'result: {x}'\n"
+
+
+def test_generate_custom_tool_rejects_name_with_path_separator():
+    """Test that a name containing path separators is rejected."""
+    fake = _fake_response(
+        {
+            "name": "../../evil",
+            "description": "Malicious tool.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "def execute():\n    return 'evil'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_name_with_forward_slash():
+    """Test that a name containing forward slash is rejected."""
+    fake = _fake_response(
+        {
+            "name": "foo/bar",
+            "description": "Tool with slash.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_name_with_space():
+    """Test that a name containing spaces is rejected."""
+    fake = _fake_response(
+        {
+            "name": "tool with spaces",
+            "description": "Tool with spaces.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_name_with_uppercase():
+    """Test that a name containing uppercase letters is rejected (per slug convention)."""
+    fake = _fake_response(
+        {
+            "name": "ParseInvoice",
+            "description": "Tool with uppercase.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_accepts_valid_slug_with_underscores_and_hyphens():
+    """Test that valid slug names with underscores and hyphens are accepted."""
+    fake = _fake_response(
+        {
+            "name": "parse_invoice-total",
+            "description": "Valid slug tool.",
+            "input_schema": {
+                "type": "object",
+                "properties": {"text": {"type": "string"}},
+                "required": ["text"],
+            },
+            "code": "def execute(text):\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        spec = generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+    assert isinstance(spec, CustomToolSpec)
+    assert spec.name == "parse_invoice-total"
+
+
+def test_generate_custom_tool_rejects_empty_name():
+    """Test that an empty name is rejected."""
+    fake = _fake_response(
+        {
+            "name": "",
+            "description": "Tool with empty name.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")

@@ -1,4 +1,5 @@
 import ast
+import re
 from dataclasses import dataclass
 
 import anthropic
@@ -75,6 +76,22 @@ def _validate_code(code: str) -> None:
         )
 
 
+def _validate_name(name: str) -> None:
+    """Validate that the tool name is a safe slug.
+
+    Only lowercase letters, digits, underscores, and hyphens are allowed.
+    Rejects names that could be used for path traversal attacks.
+    """
+    if not name:
+        raise CustomToolError("O nome da tool não pode estar vazio.")
+
+    if not re.match(r"^[a-z0-9_-]+$", name):
+        raise CustomToolError(
+            f"O nome da tool '{name}' é inválido. "
+            "Use apenas letras minúsculas, dígitos, underscores e hífens."
+        )
+
+
 def generate_custom_tool(description: str, api_key: str) -> CustomToolSpec:
     client = anthropic.Anthropic(api_key=api_key)
 
@@ -98,6 +115,7 @@ def generate_custom_tool(description: str, api_key: str) -> CustomToolSpec:
 
     plan = tool_use.input
     _validate_code(plan["code"])
+    _validate_name(plan["name"])
 
     return CustomToolSpec(
         name=plan["name"],
