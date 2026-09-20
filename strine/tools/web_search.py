@@ -34,10 +34,13 @@ def execute(query: str) -> str:
             json={"api_key": api_key, "query": query},
             timeout=10,
         )
-        data = response.json()
     except requests.RequestException as exc:
         return f"Erro ao pesquisar na web: {exc}"
 
+    if response.status_code >= 400:
+        return f"Tavily retornou um erro (status {response.status_code}): {response.text}"
+
+    data = response.json()
     results = data.get("results", [])
     if not results:
         return "Nenhum resultado encontrado."
