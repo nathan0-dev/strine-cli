@@ -6,6 +6,7 @@ from typing import List
 import typer
 
 from strine.config import MissingAPIKeyError, load_api_key
+from strine.custom_tools import CustomToolError, generate_custom_tool
 from strine.planner import PlannerError, plan_agent
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -40,6 +41,39 @@ def describe_agent(
     tools_label = ", ".join(t.upper() for t in agent_config.tools) or "nenhuma"
     typer.echo(f"✓ Tools escolhidas: {tools_label}")
     typer.echo(f"✓ Prompt gerado: {agent_config.prompt}")
+
+    custom_description = typer.prompt(
+        "\nQuer adicionar uma tool customizada? Descreva o que ela precisa "
+        "fazer (Enter pra pular)",
+        default="",
+        show_default=False,
+    )
+
+    if custom_description.strip():
+        try:
+            custom_spec = generate_custom_tool(custom_description, api_key)
+        except CustomToolError as exc:
+            typer.echo(f"Não foi possível gerar a tool customizada: {exc}", err=True)
+        else:
+            typer.echo("\nCódigo gerado para a tool customizada:\n")
+            typer.echo(custom_spec.code)
+            if typer.confirm("\nUsar essa tool?", default=True):
+                tools_dir = Path(f"{agent_config.name}_tools")
+                tools_dir.mkdir(parents=True, exist_ok=True)
+                module_path = tools_dir / f"{custom_spec.name}.py"
+                module_path.write_text(custom_spec.code)
+
+                agent_config.custom_tools.append(
+                    {
+                        "name": custom_spec.name,
+                        "description": custom_spec.description,
+                        "input_schema": custom_spec.input_schema,
+                        "module_path": str(module_path),
+                    }
+                )
+                typer.echo(f"✓ Tool customizada salva em {module_path}")
+            else:
+                typer.echo("Ok, seguindo sem essa tool.")
 
     output_path = Path(f"{agent_config.name}.json")
     output_path.write_text(
