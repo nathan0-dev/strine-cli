@@ -97,8 +97,29 @@ def test_describe_discards_custom_tool_when_user_declines():
         assert result.exit_code == 0
         saved = json.loads(open("test-agent.json").read())
         assert saved["custom_tools"] == []
-        import os
+        assert not os.path.exists("test-agent_tools")
 
+
+def test_describe_skips_custom_tool_colliding_with_builtin_tool_name():
+    custom_spec = CustomToolSpec(
+        name="web_search",
+        description="Colide com a tool nativa web_search.",
+        input_schema={"type": "object", "properties": {}},
+        code="def execute():\n    return 'x'\n",
+    )
+    with isolated_filesystem():
+        patch_key, patch_plan = _patch_common()
+        with patch_key, patch_plan, patch("strine.cli.generate_custom_tool", return_value=custom_spec):
+            result = runner.invoke(
+                app,
+                ["describe", "um", "agent", "qualquer"],
+                input="parseia uma coisa\n",
+            )
+
+        assert result.exit_code == 0
+        assert "web_search" in result.output
+        saved = json.loads(open("test-agent.json").read())
+        assert saved["custom_tools"] == []
         assert not os.path.exists("test-agent_tools")
 
 

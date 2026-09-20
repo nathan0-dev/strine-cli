@@ -8,6 +8,7 @@ import typer
 from strine.config import MissingAPIKeyError, load_api_key
 from strine.custom_tools import CustomToolError, generate_custom_tool
 from strine.planner import PlannerError, plan_agent
+from strine.tools import TOOLS
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -54,13 +55,24 @@ def describe_agent(
             custom_spec = generate_custom_tool(custom_description, api_key)
         except CustomToolError as exc:
             typer.echo(f"Não foi possível gerar a tool customizada: {exc}", err=True)
-        else:
+            custom_spec = None
+
+        if custom_spec is not None and custom_spec.name in TOOLS:
+            typer.echo(
+                f"Não foi possível usar a tool customizada: o nome "
+                f"'{custom_spec.name}' colide com uma tool nativa já "
+                "disponível. Pulei a tool customizada.",
+                err=True,
+            )
+            custom_spec = None
+
+        if custom_spec is not None:
             typer.echo("\nCódigo gerado para a tool customizada:\n")
             typer.echo(custom_spec.code)
-            if typer.confirm("\nUsar essa tool?", default=True):
-                tools_dir = Path(f"{agent_config.name}_tools")
+            tools_dir = Path(f"{agent_config.name}_tools")
+            module_path = tools_dir / f"{custom_spec.name}.py"
+            if typer.confirm(f"\nSalvar em {module_path}? (Y/n)", default=True):
                 tools_dir.mkdir(parents=True, exist_ok=True)
-                module_path = tools_dir / f"{custom_spec.name}.py"
                 module_path.write_text(custom_spec.code)
 
                 agent_config.custom_tools.append(

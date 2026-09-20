@@ -2,6 +2,8 @@ import os
 
 from dotenv import load_dotenv
 
+DEFAULT_MODEL = "claude-sonnet-5"
+
 
 class MissingAPIKeyError(RuntimeError):
     pass

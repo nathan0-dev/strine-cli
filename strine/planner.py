@@ -1,9 +1,12 @@
+import re
 from dataclasses import dataclass, field
 from typing import List
 
 import anthropic
 
-MODEL = "claude-sonnet-5"
+from strine.config import DEFAULT_MODEL
+
+MODEL = DEFAULT_MODEL
 
 VALID_TOOLS = {
     "sql",
@@ -86,6 +89,24 @@ class PlannerError(RuntimeError):
     pass
 
 
+def _validate_name(name: str) -> None:
+    """Validate that the agent name is a safe slug.
+
+    Only lowercase letters, digits, underscores, and hyphens are allowed.
+    This mirrors custom_tools.py's _validate_name — the agent name is used
+    to build filesystem paths (e.g. "{name}_tools/", "{name}.json"), so it
+    needs the same protection against path traversal / unsafe characters.
+    """
+    if not name:
+        raise PlannerError("O nome do agent não pode estar vazio.")
+
+    if not re.match(r"^[a-z0-9_-]+$", name):
+        raise PlannerError(
+            f"O nome do agent '{name}' é inválido. "
+            "Use apenas letras minúsculas, dígitos, underscores e hífens."
+        )
+
+
 def plan_agent(description: str, api_key: str) -> AgentConfig:
     """Chama o Claude pra decidir tools + system prompt + nome do agent.
 
@@ -114,5 +135,7 @@ def plan_agent(description: str, api_key: str) -> AgentConfig:
 
     plan = tool_use.input
     tools = [t for t in plan.get("tools", []) if t in VALID_TOOLS]
+
+    _validate_name(plan["name"])
 
     return AgentConfig(name=plan["name"], prompt=plan["prompt"], tools=tools)

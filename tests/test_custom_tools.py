@@ -231,6 +231,54 @@ def test_generate_custom_tool_accepts_valid_slug_with_underscores_and_hyphens():
     assert spec.name == "parse_invoice-total"
 
 
+def test_generate_custom_tool_rejects_input_schema_not_a_dict():
+    """Test that a non-dict input_schema is rejected."""
+    fake = _fake_response(
+        {
+            "name": "bad_schema_tool",
+            "description": "Tool with malformed schema.",
+            "input_schema": "not a dict",
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_input_schema_with_wrong_type():
+    """Test that an input_schema whose 'type' isn't 'object' is rejected."""
+    fake = _fake_response(
+        {
+            "name": "bad_schema_tool",
+            "description": "Tool with malformed schema.",
+            "input_schema": {"type": "string", "properties": {}},
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_input_schema_without_properties():
+    """Test that an input_schema missing a dict 'properties' is rejected."""
+    fake = _fake_response(
+        {
+            "name": "bad_schema_tool",
+            "description": "Tool with malformed schema.",
+            "input_schema": {"type": "object"},
+            "code": "def execute():\n    return 'result'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
 def test_generate_custom_tool_rejects_empty_name():
     """Test that an empty name is rejected."""
     fake = _fake_response(

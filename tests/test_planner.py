@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from strine.planner import VALID_TOOLS, AgentConfig, plan_agent
+import pytest
+
+from strine.planner import VALID_TOOLS, AgentConfig, PlannerError, plan_agent
 
 
 def test_valid_tools_includes_all_eight():
@@ -57,3 +59,42 @@ def test_plan_agent_accepts_new_tool_names():
         config = plan_agent("descrição qualquer", api_key="sk-ant-fake")
 
     assert set(config.tools) == {"web_search", "http_request"}
+
+
+def test_plan_agent_rejects_unsafe_name_with_path_separator():
+    fake = _fake_response(
+        {"name": "../../evil", "prompt": "You are helpful.", "tools": []}
+    )
+    with patch("strine.planner.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(PlannerError):
+            plan_agent("descrição qualquer", api_key="sk-ant-fake")
+
+
+def test_plan_agent_rejects_name_with_space():
+    fake = _fake_response(
+        {"name": "my agent", "prompt": "You are helpful.", "tools": []}
+    )
+    with patch("strine.planner.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(PlannerError):
+            plan_agent("descrição qualquer", api_key="sk-ant-fake")
+
+
+def test_plan_agent_rejects_empty_name():
+    fake = _fake_response({"name": "", "prompt": "You are helpful.", "tools": []})
+    with patch("strine.planner.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(PlannerError):
+            plan_agent("descrição qualquer", api_key="sk-ant-fake")
+
+
+def test_plan_agent_accepts_valid_slug_name():
+    fake = _fake_response(
+        {"name": "sales-analyzer", "prompt": "You are helpful.", "tools": []}
+    )
+    with patch("strine.planner.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        config = plan_agent("descrição qualquer", api_key="sk-ant-fake")
+
+    assert config.name == "sales-analyzer"

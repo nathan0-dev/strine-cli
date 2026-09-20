@@ -4,7 +4,9 @@ from dataclasses import dataclass
 
 import anthropic
 
-MODEL = "claude-sonnet-5"
+from strine.config import DEFAULT_MODEL
+
+MODEL = DEFAULT_MODEL
 
 SYSTEM_PROMPT = """Você escreve uma tool Python customizada pra um agent de IA,
 a partir da descrição de um usuário.
@@ -92,6 +94,28 @@ def _validate_name(name: str) -> None:
         )
 
 
+def _validate_input_schema(input_schema: dict) -> None:
+    """Validate that input_schema is a plausible JSON schema.
+
+    Must be a dict, with "type" == "object" and a "properties" dict —
+    the minimal shape the Anthropic tool-use input_schema format requires.
+    """
+    if not isinstance(input_schema, dict):
+        raise CustomToolError(
+            "O input_schema gerado é inválido: deve ser um objeto JSON."
+        )
+
+    if input_schema.get("type") != "object":
+        raise CustomToolError(
+            "O input_schema gerado é inválido: 'type' deve ser 'object'."
+        )
+
+    if not isinstance(input_schema.get("properties"), dict):
+        raise CustomToolError(
+            "O input_schema gerado é inválido: 'properties' deve ser um objeto."
+        )
+
+
 def generate_custom_tool(description: str, api_key: str) -> CustomToolSpec:
     client = anthropic.Anthropic(api_key=api_key)
 
@@ -116,6 +140,7 @@ def generate_custom_tool(description: str, api_key: str) -> CustomToolSpec:
     plan = tool_use.input
     _validate_code(plan["code"])
     _validate_name(plan["name"])
+    _validate_input_schema(plan["input_schema"])
 
     return CustomToolSpec(
         name=plan["name"],
