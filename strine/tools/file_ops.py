@@ -38,8 +38,11 @@ FILE_WRITE_SCHEMA = {
 
 
 def _resolve_safe_path(path: str) -> Path | None:
-    base = Path.cwd().resolve()
-    candidate = (base / path).resolve()
+    try:
+        base = Path.cwd().resolve()
+        candidate = (base / path).resolve()
+    except (OSError, ValueError):
+        return None
     try:
         candidate.relative_to(base)
     except ValueError:
@@ -52,8 +55,11 @@ def execute_read(path: str) -> str:
     if resolved is None:
         return f"Caminho não permitido: '{path}' está fora do diretório de trabalho."
 
-    if not resolved.is_file():
-        return f"Arquivo não encontrado: '{path}'."
+    try:
+        if not resolved.is_file():
+            return f"Arquivo não encontrado: '{path}'."
+    except OSError as exc:
+        return f"Caminho não permitido: {exc}"
 
     try:
         return resolved.read_text(encoding="utf-8")
