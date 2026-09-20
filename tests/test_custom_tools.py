@@ -72,3 +72,74 @@ def test_generate_custom_tool_wraps_api_error():
         )
         with pytest.raises(CustomToolError):
             generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_execute_as_class_method():
+    """Test that execute defined as a method inside a class is rejected."""
+    fake = _fake_response(
+        {
+            "name": "class_method_tool",
+            "description": "Tool com execute como método de classe.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "class MyTool:\n    def execute(self, **kwargs):\n        return 'hi'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_execute_as_nested_function():
+    """Test that execute defined as a nested function is rejected."""
+    fake = _fake_response(
+        {
+            "name": "nested_func_tool",
+            "description": "Tool com execute aninhada.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "def helper():\n    def execute(**kwargs):\n        return 'nested'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_rejects_async_execute():
+    """Test that async def execute is rejected (only sync functions allowed)."""
+    fake = _fake_response(
+        {
+            "name": "async_tool",
+            "description": "Tool com async execute.",
+            "input_schema": {"type": "object", "properties": {}},
+            "code": "async def execute(**kwargs):\n    return 'async'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        with pytest.raises(CustomToolError):
+            generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+
+def test_generate_custom_tool_accepts_valid_module_level_execute():
+    """Test that a valid module-level execute function is correctly accepted."""
+    fake = _fake_response(
+        {
+            "name": "valid_tool",
+            "description": "Tool válida.",
+            "input_schema": {
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+                "required": ["x"],
+            },
+            "code": "def execute(x):\n    return f'result: {x}'\n",
+        }
+    )
+    with patch("strine.custom_tools.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.return_value = fake
+        spec = generate_custom_tool("qualquer coisa", api_key="sk-ant-fake")
+
+    assert isinstance(spec, CustomToolSpec)
+    assert spec.name == "valid_tool"
+    assert spec.code == "def execute(x):\n    return f'result: {x}'\n"

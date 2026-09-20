@@ -67,7 +67,7 @@ def _validate_code(code: str) -> None:
 
     has_execute = any(
         isinstance(node, ast.FunctionDef) and node.name == "execute"
-        for node in ast.walk(tree)
+        for node in tree.body
     )
     if not has_execute:
         raise CustomToolError(
