@@ -1,7 +1,12 @@
+import json
 import sys
+from pathlib import Path
 from typing import List
 
 import typer
+
+from strine.config import MissingAPIKeyError, load_api_key
+from strine.planner import PlannerError, plan_agent
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -19,7 +24,32 @@ def describe_agent(
 ) -> None:
     """Cria um novo agent a partir de uma descrição em linguagem natural."""
     text = " ".join(description)
-    typer.echo("not implemented yet")
+
+    try:
+        api_key = load_api_key()
+    except MissingAPIKeyError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        agent_config = plan_agent(text, api_key)
+    except PlannerError as exc:
+        typer.echo(f"Erro ao planejar o agent: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    tools_label = ", ".join(t.upper() for t in agent_config.tools) or "nenhuma"
+    typer.echo(f"✓ Tools escolhidas: {tools_label}")
+    typer.echo(f"✓ Prompt gerado: {agent_config.prompt}")
+
+    output_path = Path(f"{agent_config.name}.json")
+    output_path.write_text(
+        json.dumps(agent_config.to_dict(), indent=2, ensure_ascii=False) + "\n"
+    )
+
+    typer.echo(
+        f"\nAgent salvo em ./{output_path.name}. "
+        f"Rode com: strine run ./{output_path.name}"
+    )
 
 
 @app.command()
