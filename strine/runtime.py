@@ -2,12 +2,9 @@ import importlib.util
 from pathlib import Path
 from typing import Callable, Optional
 
-import anthropic
-
-from strine.config import DEFAULT_MODEL
+from strine.providers.base import Provider, ProviderError
 from strine.tools import TOOLS
 
-MODEL = DEFAULT_MODEL
 MAX_TOOL_ROUNDS = 5
 
 
@@ -69,77 +66,62 @@ def prepare_agent_tools(agent_config: dict):
     return tool_schemas, executors, warnings
 
 
-def _call_claude(client, system_prompt: str, tool_schemas: list, messages: list):
-    kwargs = {
-        "model": MODEL,
-        "max_tokens": 1024,
-        "system": system_prompt,
-        "messages": messages,
-    }
-    if tool_schemas:
-        kwargs["tools"] = tool_schemas
-
-    try:
-        return client.messages.create(**kwargs)
-    except anthropic.APIError as exc:
-        raise AgentRuntimeError(f"Erro ao chamar a API da Anthropic: {exc}") from exc
-
-
 def run_agent(
     system_prompt: str,
     tool_schemas: list,
     executors: dict,
     user_input: str,
-    api_key: str,
+    provider: Provider,
     on_tool_call: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Roda uma pergunta do usuário contra o agent, executando tools de verdade.
 
     Cada chamada é uma conversa nova (sem memória entre perguntas do REPL).
-    Se o Claude pedir uma tool, ela é executada e o resultado volta pra ele,
-    num loop limitado a MAX_TOOL_ROUNDS idas-e-voltas, pra nunca rodar
-    indefinidamente.
+    Se o modelo pedir uma tool, ela é executada e o resultado volta pra
+    ele, num loop limitado a MAX_TOOL_ROUNDS idas-e-voltas, pra nunca
+    rodar indefinidamente.
 
     on_tool_call, se passado, é chamado com o nome da tool logo antes dela
     ser executada — permite ao chamador (cli.py) mostrar feedback visual
     sem que esse módulo precise fazer I/O diretamente.
     """
-    client = anthropic.Anthropic(api_key=api_key)
-    messages = [{"role": "user", "content": user_input}]
+    messages = [provider.build_user_message(user_input)]
 
-    response = _call_claude(client, system_prompt, tool_schemas, messages)
+    try:
+        response = provider.create_message(system_prompt, messages, tools=tool_schemas)
+    except ProviderError as exc:
+        raise AgentRuntimeError(f"Erro ao chamar a API: {exc}") from exc
 
     rounds = 0
     while response.stop_reason == "tool_use" and rounds < MAX_TOOL_ROUNDS:
-        messages.append({"role": "assistant", "content": response.content})
+        messages.append(provider.build_assistant_message(response))
 
         tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-
-            executor = executors.get(block.name)
+        for call in response.tool_calls:
+            executor = executors.get(call.name)
             if executor is None:
-                result_text = f"Tool '{block.name}' não está disponível."
+                result_text = f"Tool '{call.name}' não está disponível."
             else:
                 if on_tool_call is not None:
-                    on_tool_call(block.name)
+                    on_tool_call(call.name)
                 try:
-                    result_text = executor(**block.input)
+                    result_text = executor(**call.input)
                 except Exception as exc:
-                    result_text = f"Erro ao executar a tool '{block.name}': {exc}"
+                    result_text = f"Erro ao executar a tool '{call.name}': {exc}"
 
             tool_results.append(
-                {"type": "tool_result", "tool_use_id": block.id, "content": result_text}
+                {"tool_call_id": call.id, "name": call.name, "content": result_text}
             )
 
-        messages.append({"role": "user", "content": tool_results})
+        messages.append(provider.build_tool_result_message(tool_results))
         rounds += 1
-        response = _call_claude(client, system_prompt, tool_schemas, messages)
 
-    final_text = "\n".join(
-        block.text for block in response.content if block.type == "text"
-    ).strip()
+        try:
+            response = provider.create_message(system_prompt, messages, tools=tool_schemas)
+        except ProviderError as exc:
+            raise AgentRuntimeError(f"Erro ao chamar a API: {exc}") from exc
+
+    final_text = response.text
 
     if response.stop_reason == "tool_use" and rounds >= MAX_TOOL_ROUNDS:
         note = (

@@ -1,9 +1,8 @@
-from types import SimpleNamespace
-from unittest.mock import patch
-
 import pytest
 
+from strine.providers.base import NormalizedResponse, ToolCall
 from strine.runtime import AgentRuntimeError, prepare_agent_tools, run_agent
+from tests.fakes import FakeProvider
 
 
 # --- prepare_agent_tools ---
@@ -98,35 +97,27 @@ def test_prepare_agent_tools_handles_missing_custom_tools_key():
 
 
 def _text_response(text):
-    return SimpleNamespace(
-        stop_reason="end_turn",
-        content=[SimpleNamespace(type="text", text=text)],
-    )
+    return NormalizedResponse(stop_reason="end_turn", text=text, tool_calls=[])
 
 
-def _tool_use_response(name, tool_input, block_id="toolu_1"):
-    return SimpleNamespace(
+def _tool_use_response(name, tool_input, call_id="toolu_1"):
+    return NormalizedResponse(
         stop_reason="tool_use",
-        content=[
-            SimpleNamespace(
-                type="tool_use", id=block_id, name=name, input=tool_input
-            )
-        ],
+        text="",
+        tool_calls=[ToolCall(id=call_id, name=name, input=tool_input)],
     )
 
 
 def test_run_agent_returns_text_when_no_tool_needed():
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.return_value = _text_response(
-            "Olá! Como posso ajudar?"
-        )
-        result = run_agent(
-            system_prompt="You are helpful.",
-            tool_schemas=[],
-            executors={},
-            user_input="oi",
-            api_key="sk-ant-fake",
-        )
+    provider = FakeProvider(responses=[_text_response("Olá! Como posso ajudar?")])
+
+    result = run_agent(
+        system_prompt="You are helpful.",
+        tool_schemas=[],
+        executors={},
+        user_input="oi",
+        provider=provider,
+    )
 
     assert result == "Olá! Como posso ajudar?"
 
@@ -138,20 +129,20 @@ def test_run_agent_executes_tool_and_returns_final_text():
         executed["query"] = query
         return "42"
 
-    responses = [
-        _tool_use_response("query_database", {"query": "SELECT 1"}),
-        _text_response("O resultado é 42."),
-    ]
+    provider = FakeProvider(
+        responses=[
+            _tool_use_response("query_database", {"query": "SELECT 1"}),
+            _text_response("O resultado é 42."),
+        ]
+    )
 
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.side_effect = responses
-        result = run_agent(
-            system_prompt="You are helpful.",
-            tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
-            executors={"query_database": fake_execute},
-            user_input="quantos usuários temos?",
-            api_key="sk-ant-fake",
-        )
+    result = run_agent(
+        system_prompt="You are helpful.",
+        tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
+        executors={"query_database": fake_execute},
+        user_input="quantos usuários temos?",
+        provider=provider,
+    )
 
     assert executed["query"] == "SELECT 1"
     assert result == "O resultado é 42."
@@ -161,103 +152,92 @@ def test_run_agent_handles_tool_execution_error_gracefully():
     def failing_execute(**kwargs):
         raise ValueError("boom")
 
-    responses = [
-        _tool_use_response("broken_tool", {}),
-        _text_response("Tive um problema, mas seguimos."),
-    ]
+    provider = FakeProvider(
+        responses=[
+            _tool_use_response("broken_tool", {}),
+            _text_response("Tive um problema, mas seguimos."),
+        ]
+    )
 
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.side_effect = responses
-        result = run_agent(
-            system_prompt="You are helpful.",
-            tool_schemas=[{"name": "broken_tool", "description": "...", "input_schema": {}}],
-            executors={"broken_tool": failing_execute},
-            user_input="usa a tool quebrada",
-            api_key="sk-ant-fake",
-        )
+    result = run_agent(
+        system_prompt="You are helpful.",
+        tool_schemas=[{"name": "broken_tool", "description": "...", "input_schema": {}}],
+        executors={"broken_tool": failing_execute},
+        user_input="usa a tool quebrada",
+        provider=provider,
+    )
 
     assert result == "Tive um problema, mas seguimos."
 
 
 def test_run_agent_stops_after_max_tool_rounds():
-    call_count = {"n": 0}
+    provider = FakeProvider(
+        responses=[_tool_use_response("loopy_tool", {}) for _ in range(6)]
+    )
 
-    def always_tool_use(*args, **kwargs):
-        call_count["n"] += 1
-        return _tool_use_response("loopy_tool", {})
+    result = run_agent(
+        system_prompt="You are helpful.",
+        tool_schemas=[{"name": "loopy_tool", "description": "...", "input_schema": {}}],
+        executors={"loopy_tool": lambda **kwargs: "still going"},
+        user_input="loop forever",
+        provider=provider,
+    )
 
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.side_effect = always_tool_use
-        result = run_agent(
-            system_prompt="You are helpful.",
-            tool_schemas=[{"name": "loopy_tool", "description": "...", "input_schema": {}}],
-            executors={"loopy_tool": lambda **kwargs: "still going"},
-            user_input="loop forever",
-            api_key="sk-ant-fake",
-        )
-
-    # initial call + 5 tool rounds = 6 calls total, never unbounded
-    assert call_count["n"] == 6
+    # initial call + 5 tool rounds = 6 chamadas totais, nunca ilimitado
+    assert len(provider.calls) == 6
     assert "limite" in result.lower()
 
 
 def test_run_agent_calls_on_tool_call_callback_before_executing_tool():
     calls = []
 
-    def fake_execute(query):
-        return "42"
+    provider = FakeProvider(
+        responses=[
+            _tool_use_response("query_database", {"query": "SELECT 1"}),
+            _text_response("O resultado é 42."),
+        ]
+    )
 
-    responses = [
-        _tool_use_response("query_database", {"query": "SELECT 1"}),
-        _text_response("O resultado é 42."),
-    ]
-
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.side_effect = responses
-        result = run_agent(
-            system_prompt="You are helpful.",
-            tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
-            executors={"query_database": fake_execute},
-            user_input="quantos usuários temos?",
-            api_key="sk-ant-fake",
-            on_tool_call=lambda name: calls.append(name),
-        )
+    result = run_agent(
+        system_prompt="You are helpful.",
+        tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
+        executors={"query_database": lambda query: "42"},
+        user_input="quantos usuários temos?",
+        provider=provider,
+        on_tool_call=lambda name: calls.append(name),
+    )
 
     assert calls == ["query_database"]
     assert result == "O resultado é 42."
 
 
 def test_run_agent_works_without_on_tool_call_callback():
-    responses = [
-        _tool_use_response("query_database", {"query": "SELECT 1"}),
-        _text_response("O resultado é 42."),
-    ]
+    provider = FakeProvider(
+        responses=[
+            _tool_use_response("query_database", {"query": "SELECT 1"}),
+            _text_response("O resultado é 42."),
+        ]
+    )
 
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.side_effect = responses
-        result = run_agent(
-            system_prompt="You are helpful.",
-            tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
-            executors={"query_database": lambda query: "42"},
-            user_input="quantos usuários temos?",
-            api_key="sk-ant-fake",
-        )
+    result = run_agent(
+        system_prompt="You are helpful.",
+        tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
+        executors={"query_database": lambda query: "42"},
+        user_input="quantos usuários temos?",
+        provider=provider,
+    )
 
     assert result == "O resultado é 42."
 
 
-def test_run_agent_raises_runtime_error_on_api_error():
-    import anthropic
+def test_run_agent_raises_runtime_error_on_provider_error():
+    provider = FakeProvider(raise_error="boom")
 
-    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
-        MockAnthropic.return_value.messages.create.side_effect = anthropic.APIError(
-            "boom", request=SimpleNamespace(), body=None
+    with pytest.raises(AgentRuntimeError):
+        run_agent(
+            system_prompt="You are helpful.",
+            tool_schemas=[],
+            executors={},
+            user_input="oi",
+            provider=provider,
         )
-        with pytest.raises(AgentRuntimeError):
-            run_agent(
-                system_prompt="You are helpful.",
-                tool_schemas=[],
-                executors={},
-                user_input="oi",
-                api_key="sk-ant-fake",
-            )
