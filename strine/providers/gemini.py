@@ -13,9 +13,12 @@ class GeminiProvider(Provider):
     name = "gemini"
 
     def __init__(self, api_key: str, model: Optional[str] = None):
-        self.api_key = api_key
         self._client = genai.Client(api_key=api_key)
         self._model = model or DEFAULT_GEMINI_MODEL
+        # Ids que a Gemini API não populou em FunctionCall.id e que nós
+        # inventamos só pra correlação interna (runtime.py). Nunca devem
+        # ser reenviados pra API como se fossem ids nativos dela.
+        self._synthetic_tool_call_ids: set = set()
 
     def build_user_message(self, text: str) -> types.Content:
         return types.Content(role="user", parts=[types.Part(text=text)])
@@ -57,16 +60,27 @@ class GeminiProvider(Provider):
         except genai_errors.APIError as exc:
             raise ProviderError(f"Erro ao chamar a API do Gemini: {exc}") from exc
 
+        if not response.candidates or response.candidates[0].content is None:
+            raise ProviderError(
+                "O Gemini não retornou conteúdo — a resposta pode ter sido "
+                "bloqueada por filtros de segurança."
+            )
+
         parts = response.candidates[0].content.parts or []
 
+        self._synthetic_tool_call_ids = set()
         tool_calls = []
         text_chunks = []
         for index, part in enumerate(parts):
             if part.function_call is not None:
                 call = part.function_call
+                native_id = call.id
+                call_id = native_id or f"call_{index}"
+                if not native_id:
+                    self._synthetic_tool_call_ids.add(call_id)
                 tool_calls.append(
                     ToolCall(
-                        id=call.id or f"call_{index}",
+                        id=call_id,
                         name=call.name,
                         input=call.args or {},
                     )
@@ -87,22 +101,26 @@ class GeminiProvider(Provider):
         if response.text:
             parts.append(types.Part(text=response.text))
         for call in response.tool_calls:
+            wire_id = None if call.id in self._synthetic_tool_call_ids else call.id
             parts.append(
                 types.Part(
-                    function_call=types.FunctionCall(id=call.id, name=call.name, args=call.input)
+                    function_call=types.FunctionCall(id=wire_id, name=call.name, args=call.input)
                 )
             )
         return types.Content(role="model", parts=parts)
 
     def build_tool_result_message(self, tool_results: list) -> types.Content:
-        parts = [
-            types.Part(
-                function_response=types.FunctionResponse(
-                    id=result["tool_call_id"],
-                    name=result["name"],
-                    response={"output": result["content"]},
+        parts = []
+        for result in tool_results:
+            call_id = result["tool_call_id"]
+            wire_id = None if call_id in self._synthetic_tool_call_ids else call_id
+            parts.append(
+                types.Part(
+                    function_response=types.FunctionResponse(
+                        id=wire_id,
+                        name=result["name"],
+                        response={"output": result["content"]},
+                    )
                 )
             )
-            for result in tool_results
-        ]
         return types.Content(role="user", parts=parts)

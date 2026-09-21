@@ -111,3 +111,69 @@ def test_build_tool_result_message_wraps_content_in_output_dict():
     assert part.function_response.id == "call_abc"
     assert part.function_response.name == "query_database"
     assert part.function_response.response == {"output": "42"}
+
+
+def test_native_tool_call_id_round_trips_into_wire_messages():
+    with patch("strine.providers.gemini.genai.Client") as MockClient:
+        MockClient.return_value.models.generate_content.return_value = _fake_response(
+            _function_call_part("query_database", {"query": "SELECT 1"}, call_id="call_abc")
+        )
+        provider = GeminiProvider(api_key="fake-gemini-key")
+        response = provider.create_message(
+            "system",
+            [provider.build_user_message("oi")],
+            tools=[{"name": "query_database", "description": "...", "input_schema": {}}],
+        )
+
+    assistant_message = provider.build_assistant_message(response)
+    assert assistant_message.parts[0].function_call.id == "call_abc"
+
+    tool_result_message = provider.build_tool_result_message(
+        [{"tool_call_id": "call_abc", "name": "query_database", "content": "42"}]
+    )
+    assert tool_result_message.parts[0].function_response.id == "call_abc"
+
+
+def test_synthetic_tool_call_id_is_not_echoed_back_to_the_wire():
+    with patch("strine.providers.gemini.genai.Client") as MockClient:
+        MockClient.return_value.models.generate_content.return_value = _fake_response(
+            _function_call_part("query_database", {"query": "SELECT 1"}, call_id=None)
+        )
+        provider = GeminiProvider(api_key="fake-gemini-key")
+        response = provider.create_message(
+            "system",
+            [provider.build_user_message("oi")],
+            tools=[{"name": "query_database", "description": "...", "input_schema": {}}],
+        )
+
+    # Internal bookkeeping still uses the synthetic id.
+    assert response.tool_calls[0].id == "call_0"
+
+    assistant_message = provider.build_assistant_message(response)
+    assert assistant_message.parts[0].function_call.id is None
+
+    tool_result_message = provider.build_tool_result_message(
+        [{"tool_call_id": "call_0", "name": "query_database", "content": "42"}]
+    )
+    assert tool_result_message.parts[0].function_response.id is None
+
+
+def test_create_message_raises_provider_error_on_empty_candidates():
+    with patch("strine.providers.gemini.genai.Client") as MockClient:
+        MockClient.return_value.models.generate_content.return_value = SimpleNamespace(
+            candidates=[]
+        )
+        provider = GeminiProvider(api_key="fake-gemini-key")
+        with pytest.raises(ProviderError):
+            provider.create_message("system", [provider.build_user_message("oi")])
+
+
+def test_create_message_raises_provider_error_when_content_is_none():
+    with patch("strine.providers.gemini.genai.Client") as MockClient:
+        blocked_candidate = SimpleNamespace(content=None)
+        MockClient.return_value.models.generate_content.return_value = SimpleNamespace(
+            candidates=[blocked_candidate]
+        )
+        provider = GeminiProvider(api_key="fake-gemini-key")
+        with pytest.raises(ProviderError):
+            provider.create_message("system", [provider.build_user_message("oi")])
