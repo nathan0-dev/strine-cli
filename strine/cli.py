@@ -4,6 +4,9 @@ from pathlib import Path
 from typing import List
 
 import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
 
 from strine.config import MissingAPIKeyError, load_api_key
 from strine.custom_tools import CustomToolError, generate_custom_tool
@@ -28,23 +31,26 @@ def describe_agent(
     ),
 ) -> None:
     """Cria um novo agent a partir de uma descrição em linguagem natural."""
+    console = Console()
     text = " ".join(description)
 
     try:
         api_key = load_api_key()
     except MissingAPIKeyError as exc:
-        typer.echo(str(exc), err=True)
+        console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
 
     try:
-        agent_config = plan_agent(text, api_key)
+        with console.status("[bold cyan]Planejando o agent...[/bold cyan]"):
+            agent_config = plan_agent(text, api_key)
     except PlannerError as exc:
-        typer.echo(f"Erro ao planejar o agent: {exc}", err=True)
+        console.print(f"[red]Erro ao planejar o agent: {exc}[/red]")
         raise typer.Exit(code=1)
 
-    tools_label = ", ".join(t.upper() for t in agent_config.tools) or "nenhuma"
-    typer.echo(f"✓ Tools escolhidas: {tools_label}")
-    typer.echo(f"✓ Prompt gerado: {agent_config.prompt}")
+    tools_label = ", ".join(agent_config.tools) or "nenhuma"
+    console.print(f"[bold green]✓[/bold green] Agent: [bold]{agent_config.name}[/bold]")
+    console.print(f"[bold green]✓[/bold green] Tools escolhidas: [cyan]{tools_label}[/cyan]")
+    console.print(Panel(agent_config.prompt, title="Prompt gerado", border_style="cyan"))
 
     custom_description = typer.prompt(
         "\nQuer adicionar uma tool customizada? Descreva o que ela precisa "
@@ -54,24 +60,24 @@ def describe_agent(
     )
 
     if custom_description.strip():
+        custom_spec = None
         try:
-            custom_spec = generate_custom_tool(custom_description, api_key)
+            with console.status("[bold cyan]Gerando tool customizada...[/bold cyan]"):
+                custom_spec = generate_custom_tool(custom_description, api_key)
         except CustomToolError as exc:
-            typer.echo(f"Não foi possível gerar a tool customizada: {exc}", err=True)
-            custom_spec = None
+            console.print(f"[red]Não foi possível gerar a tool customizada: {exc}[/red]")
 
         if custom_spec is not None and custom_spec.name in TOOLS:
-            typer.echo(
-                f"Não foi possível usar a tool customizada: o nome "
+            console.print(
+                f"[red]Não foi possível usar a tool customizada: o nome "
                 f"'{custom_spec.name}' colide com uma tool nativa já "
-                "disponível. Pulei a tool customizada.",
-                err=True,
+                "disponível. Pulei a tool customizada.[/red]"
             )
             custom_spec = None
 
         if custom_spec is not None:
-            typer.echo("\nCódigo gerado para a tool customizada:\n")
-            typer.echo(custom_spec.code)
+            console.print("\n[bold]Código gerado para a tool customizada:[/bold]\n")
+            console.print(Syntax(custom_spec.code, "python"))
             tools_dir = Path(f"{agent_config.name}_tools")
             module_path = tools_dir / f"{custom_spec.name}.py"
             if typer.confirm(f"\nSalvar em {module_path}? (Y/n)", default=True):
@@ -86,18 +92,18 @@ def describe_agent(
                         "module_path": str(module_path),
                     }
                 )
-                typer.echo(f"✓ Tool customizada salva em {module_path}")
+                console.print(f"[bold green]✓[/bold green] Tool customizada salva em {module_path}")
             else:
-                typer.echo("Ok, seguindo sem essa tool.")
+                console.print("Ok, seguindo sem essa tool.")
 
     output_path = Path(f"{agent_config.name}.json")
     output_path.write_text(
         json.dumps(agent_config.to_dict(), indent=2, ensure_ascii=False) + "\n"
     )
 
-    typer.echo(
-        f"\nAgent salvo em ./{output_path.name}. "
-        f"Rode com: strine run ./{output_path.name}"
+    console.print(
+        f"\n[bold green]Agent salvo em[/bold green] ./{output_path.name}. "
+        f"Rode com: [bold]strine run ./{output_path.name}[/bold]"
     )
 
 
@@ -109,64 +115,72 @@ def run(
     ),
 ) -> None:
     """Roda um agent a partir de um arquivo de config gerado anteriormente."""
+    console = Console()
     path = Path(config_path)
 
     try:
         raw = path.read_text()
     except FileNotFoundError:
-        typer.echo(f"Arquivo não encontrado: {config_path}", err=True)
+        console.print(f"[red]Arquivo não encontrado: {config_path}[/red]")
         raise typer.Exit(code=1)
 
     try:
         agent_config = json.loads(raw)
     except json.JSONDecodeError as exc:
-        typer.echo(f"Arquivo de config inválido ({config_path}): {exc}", err=True)
+        console.print(f"[red]Arquivo de config inválido ({config_path}): {exc}[/red]")
         raise typer.Exit(code=1)
 
     try:
         api_key = load_api_key()
     except MissingAPIKeyError as exc:
-        typer.echo(str(exc), err=True)
+        console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
 
     tool_schemas, executors, warnings = prepare_agent_tools(agent_config)
     for warning in warnings:
-        typer.echo(f"⚠ {warning}", err=True)
+        console.print(f"[yellow]⚠ {warning}[/yellow]")
 
     name = agent_config.get("name", "agent")
     tools_label = ", ".join(agent_config.get("tools", [])) or "nenhuma"
     system_prompt = agent_config.get("prompt", "")
 
-    typer.echo(f"Agent: {name} (tools: {tools_label})")
-    typer.echo("Digite sua pergunta, ou 'sair' pra encerrar.\n")
+    console.print(
+        Panel(f"[bold]{name}[/bold]\nTools: [cyan]{tools_label}[/cyan]", title="Agent")
+    )
+    console.print("Digite sua pergunta, ou 'sair' pra encerrar.\n")
+
+    def on_tool_call(tool_name: str) -> None:
+        console.print(f"[dim]🔧 Usando {tool_name}...[/dim]")
 
     while True:
         try:
             user_input = typer.prompt("Você")
         except (KeyboardInterrupt, EOFError, typer.Abort):
-            typer.echo("\nAté mais!")
+            console.print("\nAté mais!")
             break
 
         if user_input.strip().lower() in _EXIT_WORDS:
-            typer.echo("Até mais!")
+            console.print("Até mais!")
             break
 
         if not user_input.strip():
             continue
 
         try:
-            response_text = run_agent(
-                system_prompt=system_prompt,
-                tool_schemas=tool_schemas,
-                executors=executors,
-                user_input=user_input,
-                api_key=api_key,
-            )
+            with console.status("[bold cyan]Pensando...[/bold cyan]"):
+                response_text = run_agent(
+                    system_prompt=system_prompt,
+                    tool_schemas=tool_schemas,
+                    executors=executors,
+                    user_input=user_input,
+                    api_key=api_key,
+                    on_tool_call=on_tool_call,
+                )
         except AgentRuntimeError as exc:
-            typer.echo(f"Erro: {exc}", err=True)
+            console.print(f"[red]Erro: {exc}[/red]")
             continue
 
-        typer.echo(f"\nAgent: {response_text}\n")
+        console.print(f"\n[bold cyan]Agent:[/bold cyan] {response_text}\n")
 
 
 def main() -> None:

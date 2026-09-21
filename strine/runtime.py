@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+from typing import Callable, Optional
 
 import anthropic
 
@@ -90,6 +91,7 @@ def run_agent(
     executors: dict,
     user_input: str,
     api_key: str,
+    on_tool_call: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Roda uma pergunta do usuário contra o agent, executando tools de verdade.
 
@@ -97,6 +99,10 @@ def run_agent(
     Se o Claude pedir uma tool, ela é executada e o resultado volta pra ele,
     num loop limitado a MAX_TOOL_ROUNDS idas-e-voltas, pra nunca rodar
     indefinidamente.
+
+    on_tool_call, se passado, é chamado com o nome da tool logo antes dela
+    ser executada — permite ao chamador (cli.py) mostrar feedback visual
+    sem que esse módulo precise fazer I/O diretamente.
     """
     client = anthropic.Anthropic(api_key=api_key)
     messages = [{"role": "user", "content": user_input}]
@@ -116,6 +122,8 @@ def run_agent(
             if executor is None:
                 result_text = f"Tool '{block.name}' não está disponível."
             else:
+                if on_tool_call is not None:
+                    on_tool_call(block.name)
                 try:
                     result_text = executor(**block.input)
                 except Exception as exc:

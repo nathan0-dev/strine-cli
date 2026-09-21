@@ -201,6 +201,51 @@ def test_run_agent_stops_after_max_tool_rounds():
     assert "limite" in result.lower()
 
 
+def test_run_agent_calls_on_tool_call_callback_before_executing_tool():
+    calls = []
+
+    def fake_execute(query):
+        return "42"
+
+    responses = [
+        _tool_use_response("query_database", {"query": "SELECT 1"}),
+        _text_response("O resultado é 42."),
+    ]
+
+    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.side_effect = responses
+        result = run_agent(
+            system_prompt="You are helpful.",
+            tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
+            executors={"query_database": fake_execute},
+            user_input="quantos usuários temos?",
+            api_key="sk-ant-fake",
+            on_tool_call=lambda name: calls.append(name),
+        )
+
+    assert calls == ["query_database"]
+    assert result == "O resultado é 42."
+
+
+def test_run_agent_works_without_on_tool_call_callback():
+    responses = [
+        _tool_use_response("query_database", {"query": "SELECT 1"}),
+        _text_response("O resultado é 42."),
+    ]
+
+    with patch("strine.runtime.anthropic.Anthropic") as MockAnthropic:
+        MockAnthropic.return_value.messages.create.side_effect = responses
+        result = run_agent(
+            system_prompt="You are helpful.",
+            tool_schemas=[{"name": "query_database", "description": "...", "input_schema": {}}],
+            executors={"query_database": lambda query: "42"},
+            user_input="quantos usuários temos?",
+            api_key="sk-ant-fake",
+        )
+
+    assert result == "O resultado é 42."
+
+
 def test_run_agent_raises_runtime_error_on_api_error():
     import anthropic
 
