@@ -8,7 +8,10 @@ import typer
 from strine.config import MissingAPIKeyError, load_api_key
 from strine.custom_tools import CustomToolError, generate_custom_tool
 from strine.planner import PlannerError, plan_agent
+from strine.runtime import AgentRuntimeError, prepare_agent_tools, run_agent
 from strine.tools import TOOLS
+
+_EXIT_WORDS = {"sair", "exit"}
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -106,7 +109,64 @@ def run(
     ),
 ) -> None:
     """Roda um agent a partir de um arquivo de config gerado anteriormente."""
-    typer.echo("not implemented yet")
+    path = Path(config_path)
+
+    try:
+        raw = path.read_text()
+    except FileNotFoundError:
+        typer.echo(f"Arquivo não encontrado: {config_path}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        agent_config = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        typer.echo(f"Arquivo de config inválido ({config_path}): {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        api_key = load_api_key()
+    except MissingAPIKeyError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+    tool_schemas, executors, warnings = prepare_agent_tools(agent_config)
+    for warning in warnings:
+        typer.echo(f"⚠ {warning}", err=True)
+
+    name = agent_config.get("name", "agent")
+    tools_label = ", ".join(agent_config.get("tools", [])) or "nenhuma"
+    system_prompt = agent_config.get("prompt", "")
+
+    typer.echo(f"Agent: {name} (tools: {tools_label})")
+    typer.echo("Digite sua pergunta, ou 'sair' pra encerrar.\n")
+
+    while True:
+        try:
+            user_input = typer.prompt("Você")
+        except (KeyboardInterrupt, EOFError, typer.Abort):
+            typer.echo("\nAté mais!")
+            break
+
+        if user_input.strip().lower() in _EXIT_WORDS:
+            typer.echo("Até mais!")
+            break
+
+        if not user_input.strip():
+            continue
+
+        try:
+            response_text = run_agent(
+                system_prompt=system_prompt,
+                tool_schemas=tool_schemas,
+                executors=executors,
+                user_input=user_input,
+                api_key=api_key,
+            )
+        except AgentRuntimeError as exc:
+            typer.echo(f"Erro: {exc}", err=True)
+            continue
+
+        typer.echo(f"\nAgent: {response_text}\n")
 
 
 def main() -> None:
