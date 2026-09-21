@@ -2,13 +2,18 @@ import os
 
 from dotenv import load_dotenv
 
+DEFAULT_MODEL = "claude-sonnet-5"
+
 
 class MissingAPIKeyError(RuntimeError):
     pass
 
 
 def load_api_key() -> str:
-    load_dotenv()
+    # override=True: o .env do projeto tem prioridade sobre uma variável de
+    # ambiente já exportada no shell (evita usar uma key antiga/errada
+    # silenciosamente quando o usuário configura uma nova no .env).
+    load_dotenv(override=True)
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise MissingAPIKeyError(
