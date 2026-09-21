@@ -10,6 +10,7 @@ class ClaudeProvider(Provider):
     name = "claude"
 
     def __init__(self, api_key: str, model: Optional[str] = None):
+        self.api_key = api_key
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model or DEFAULT_MODEL
 

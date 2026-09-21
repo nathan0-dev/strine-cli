@@ -32,8 +32,11 @@ def isolated_filesystem():
 
 
 def _patch_common():
+    from unittest.mock import MagicMock
+    mock_provider = MagicMock()
+    mock_provider.api_key = "sk-ant-fake"
     return (
-        patch("strine.cli.load_api_key", return_value="sk-ant-fake"),
+        patch("strine.cli.get_provider", return_value=mock_provider),
         patch(
             "strine.cli.plan_agent",
             return_value=AgentConfig(name="test-agent", prompt="You help.", tools=["sql"]),

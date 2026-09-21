@@ -8,7 +8,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from strine.config import MissingAPIKeyError, load_api_key
+from strine.config import MissingAPIKeyError
+from strine.providers import get_provider
 from strine.custom_tools import CustomToolError, generate_custom_tool
 from strine.planner import PlannerError, plan_agent
 from strine.runtime import AgentRuntimeError, prepare_agent_tools, run_agent
@@ -35,7 +36,8 @@ def describe_agent(
     text = " ".join(description)
 
     try:
-        api_key = load_api_key()
+        provider = get_provider("claude")
+        api_key = provider.api_key
     except MissingAPIKeyError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
@@ -131,7 +133,8 @@ def run(
         raise typer.Exit(code=1)
 
     try:
-        api_key = load_api_key()
+        provider = get_provider("claude")
+        api_key = provider.api_key
     except MissingAPIKeyError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)

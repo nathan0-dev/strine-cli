@@ -13,6 +13,7 @@ class GeminiProvider(Provider):
     name = "gemini"
 
     def __init__(self, api_key: str, model: Optional[str] = None):
+        self.api_key = api_key
         self._client = genai.Client(api_key=api_key)
         self._model = model or DEFAULT_GEMINI_MODEL
 

@@ -46,7 +46,7 @@ def test_run_missing_api_key_shows_friendly_error_and_exits_1():
 
     with isolated_filesystem():
         _write_agent_json()
-        with patch("strine.cli.load_api_key", side_effect=MissingAPIKeyError("sem key")):
+        with patch("strine.cli.get_provider", side_effect=MissingAPIKeyError("sem key")):
             result = runner.invoke(app, ["run", "./test-agent.json"])
 
     assert result.exit_code == 1
@@ -54,10 +54,13 @@ def test_run_missing_api_key_shows_friendly_error_and_exits_1():
 
 
 def test_run_executes_turn_and_exits_on_sair():
+    from unittest.mock import MagicMock
     with isolated_filesystem():
         _write_agent_json()
+        mock_provider = MagicMock()
+        mock_provider.api_key = "sk-ant-fake"
         with (
-            patch("strine.cli.load_api_key", return_value="sk-ant-fake"),
+            patch("strine.cli.get_provider", return_value=mock_provider),
             patch(
                 "strine.cli.prepare_agent_tools",
                 return_value=([], {}, []),
@@ -76,10 +79,13 @@ def test_run_executes_turn_and_exits_on_sair():
 
 
 def test_run_prints_warnings_from_prepare_agent_tools():
+    from unittest.mock import MagicMock
     with isolated_filesystem():
         _write_agent_json()
+        mock_provider = MagicMock()
+        mock_provider.api_key = "sk-ant-fake"
         with (
-            patch("strine.cli.load_api_key", return_value="sk-ant-fake"),
+            patch("strine.cli.get_provider", return_value=mock_provider),
             patch(
                 "strine.cli.prepare_agent_tools",
                 return_value=([], {}, ["Tool 'ghost' não pôde ser carregada."]),
@@ -92,10 +98,13 @@ def test_run_prints_warnings_from_prepare_agent_tools():
 
 
 def test_run_handles_agent_runtime_error_without_crashing_repl():
+    from unittest.mock import MagicMock
     with isolated_filesystem():
         _write_agent_json()
+        mock_provider = MagicMock()
+        mock_provider.api_key = "sk-ant-fake"
         with (
-            patch("strine.cli.load_api_key", return_value="sk-ant-fake"),
+            patch("strine.cli.get_provider", return_value=mock_provider),
             patch("strine.cli.prepare_agent_tools", return_value=([], {}, [])),
             patch(
                 "strine.cli.run_agent",
