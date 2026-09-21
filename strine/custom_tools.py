@@ -2,11 +2,7 @@ import ast
 import re
 from dataclasses import dataclass
 
-import anthropic
-
-from strine.config import DEFAULT_MODEL
-
-MODEL = DEFAULT_MODEL
+from strine.providers.base import Provider, ProviderError
 
 SYSTEM_PROMPT = """Você escreve uma tool Python customizada pra um agent de IA,
 a partir da descrição de um usuário.
@@ -116,28 +112,21 @@ def _validate_input_schema(input_schema: dict) -> None:
         )
 
 
-def generate_custom_tool(description: str, api_key: str) -> CustomToolSpec:
-    client = anthropic.Anthropic(api_key=api_key)
-
+def generate_custom_tool(description: str, provider: Provider) -> CustomToolSpec:
     try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
+        response = provider.create_message(
+            system_prompt=SYSTEM_PROMPT,
+            messages=[provider.build_user_message(description)],
             tools=[CREATE_CUSTOM_TOOL_TOOL],
-            tool_choice={"type": "tool", "name": "create_custom_tool"},
-            messages=[{"role": "user", "content": description}],
+            force_tool="create_custom_tool",
         )
-    except anthropic.APIError as exc:
-        raise CustomToolError(f"Erro ao chamar a API da Anthropic: {exc}") from exc
+    except ProviderError as exc:
+        raise CustomToolError(f"Erro ao chamar a API: {exc}") from exc
 
-    tool_use = next(
-        (block for block in response.content if block.type == "tool_use"), None
-    )
-    if tool_use is None:
+    if not response.tool_calls:
         raise CustomToolError("O modelo não retornou uma tool customizada estruturada.")
 
-    plan = tool_use.input
+    plan = response.tool_calls[0].input
     _validate_code(plan["code"])
     _validate_name(plan["name"])
     _validate_input_schema(plan["input_schema"])
