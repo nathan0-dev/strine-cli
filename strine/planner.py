@@ -2,11 +2,7 @@ import re
 from dataclasses import dataclass, field
 from typing import List
 
-import anthropic
-
-from strine.config import DEFAULT_MODEL
-
-MODEL = DEFAULT_MODEL
+from strine.providers.base import Provider, ProviderError
 
 VALID_TOOLS = {
     "sql",
@@ -75,6 +71,7 @@ class AgentConfig:
     prompt: str
     tools: List[str] = field(default_factory=list)
     custom_tools: List[dict] = field(default_factory=list)
+    provider: str = "claude"
 
     def to_dict(self) -> dict:
         return {
@@ -82,6 +79,7 @@ class AgentConfig:
             "prompt": self.prompt,
             "tools": self.tools,
             "custom_tools": self.custom_tools,
+            "provider": self.provider,
         }
 
 
@@ -107,35 +105,30 @@ def _validate_name(name: str) -> None:
         )
 
 
-def plan_agent(description: str, api_key: str) -> AgentConfig:
-    """Chama o Claude pra decidir tools + system prompt + nome do agent.
+def plan_agent(description: str, provider: Provider) -> AgentConfig:
+    """Chama o provider pra decidir tools + system prompt + nome do agent.
 
-    Usa tool use forçado (tool_choice) em vez de pedir "responda em JSON" e
+    Usa tool use forçado (force_tool) em vez de pedir "responda em JSON" e
     fazer parsing manual — o schema garante o formato da resposta.
     """
-    client = anthropic.Anthropic(api_key=api_key)
-
     try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
+        response = provider.create_message(
+            system_prompt=SYSTEM_PROMPT,
+            messages=[provider.build_user_message(description)],
             tools=[AGENT_PLAN_TOOL],
-            tool_choice={"type": "tool", "name": "create_agent_plan"},
-            messages=[{"role": "user", "content": description}],
+            force_tool="create_agent_plan",
         )
-    except anthropic.APIError as exc:
-        raise PlannerError(f"Erro ao chamar a API da Anthropic: {exc}") from exc
+    except ProviderError as exc:
+        raise PlannerError(f"Erro ao chamar a API: {exc}") from exc
 
-    tool_use = next(
-        (block for block in response.content if block.type == "tool_use"), None
-    )
-    if tool_use is None:
+    if not response.tool_calls:
         raise PlannerError("O modelo não retornou um plano estruturado.")
 
-    plan = tool_use.input
+    plan = response.tool_calls[0].input
     tools = [t for t in plan.get("tools", []) if t in VALID_TOOLS]
 
     _validate_name(plan["name"])
 
-    return AgentConfig(name=plan["name"], prompt=plan["prompt"], tools=tools)
+    return AgentConfig(
+        name=plan["name"], prompt=plan["prompt"], tools=tools, provider=provider.name
+    )
