@@ -9,9 +9,9 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 
 from strine.config import MissingAPIKeyError
-from strine.providers import get_provider
 from strine.custom_tools import CustomToolError, generate_custom_tool
 from strine.planner import PlannerError, plan_agent
+from strine.providers import DEFAULT_PROVIDER, UnknownProviderError, get_provider
 from strine.runtime import AgentRuntimeError, prepare_agent_tools, run_agent
 from strine.tools import TOOLS
 
@@ -30,21 +30,28 @@ def describe_agent(
         ...,
         help="Descrição em linguagem natural do agent que você quer criar.",
     ),
+    provider_name: str = typer.Option(
+        DEFAULT_PROVIDER,
+        "--provider",
+        help="Provider de IA a usar (claude, gemini).",
+    ),
 ) -> None:
     """Cria um novo agent a partir de uma descrição em linguagem natural."""
     console = Console()
     text = " ".join(description)
 
     try:
-        provider = get_provider("claude")
-        api_key = provider.api_key
+        provider = get_provider(provider_name)
+    except UnknownProviderError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1)
     except MissingAPIKeyError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
 
     try:
         with console.status("[bold cyan]Planejando o agent...[/bold cyan]"):
-            agent_config = plan_agent(text, api_key)
+            agent_config = plan_agent(text, provider)
     except PlannerError as exc:
         console.print(f"[red]Erro ao planejar o agent: {exc}[/red]")
         raise typer.Exit(code=1)
@@ -65,7 +72,7 @@ def describe_agent(
         custom_spec = None
         try:
             with console.status("[bold cyan]Gerando tool customizada...[/bold cyan]"):
-                custom_spec = generate_custom_tool(custom_description, api_key)
+                custom_spec = generate_custom_tool(custom_description, provider)
         except CustomToolError as exc:
             console.print(f"[red]Não foi possível gerar a tool customizada: {exc}[/red]")
 
@@ -132,10 +139,10 @@ def run(
         console.print(f"[red]Arquivo de config inválido ({config_path}): {exc}[/red]")
         raise typer.Exit(code=1)
 
+    provider_name = agent_config.get("provider", "claude")
     try:
-        provider = get_provider("claude")
-        api_key = provider.api_key
-    except MissingAPIKeyError as exc:
+        provider = get_provider(provider_name)
+    except (UnknownProviderError, MissingAPIKeyError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
 
@@ -176,7 +183,7 @@ def run(
                     tool_schemas=tool_schemas,
                     executors=executors,
                     user_input=user_input,
-                    api_key=api_key,
+                    provider=provider,
                     on_tool_call=on_tool_call,
                 )
         except AgentRuntimeError as exc:

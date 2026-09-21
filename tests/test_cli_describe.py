@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from strine.cli import app
 from strine.custom_tools import CustomToolSpec
 from strine.planner import AgentConfig
+from tests.fakes import FakeProvider
 
 runner = CliRunner()
 
@@ -32,11 +33,8 @@ def isolated_filesystem():
 
 
 def _patch_common():
-    from unittest.mock import MagicMock
-    mock_provider = MagicMock()
-    mock_provider.api_key = "sk-ant-fake"
     return (
-        patch("strine.cli.get_provider", return_value=mock_provider),
+        patch("strine.cli.get_provider", return_value=FakeProvider(name_override="claude")),
         patch(
             "strine.cli.plan_agent",
             return_value=AgentConfig(name="test-agent", prompt="You help.", tools=["sql"]),
@@ -101,6 +99,34 @@ def test_describe_discards_custom_tool_when_user_declines():
         saved = json.loads(open("test-agent.json").read())
         assert saved["custom_tools"] == []
         assert not os.path.exists("test-agent_tools")
+
+
+def test_describe_passes_selected_provider_to_get_provider():
+    with isolated_filesystem():
+        patch_key, patch_plan = _patch_common()
+        with patch_key as mock_get_provider, patch_plan:
+            result = runner.invoke(
+                app, ["describe", "--provider", "gemini", "um", "agent", "qualquer"], input="\n"
+            )
+
+        assert result.exit_code == 0
+        mock_get_provider.assert_called_once_with("gemini")
+
+
+def test_describe_unknown_provider_shows_friendly_error():
+    from strine.providers import UnknownProviderError
+
+    with isolated_filesystem():
+        with patch(
+            "strine.cli.get_provider",
+            side_effect=UnknownProviderError("Provider 'bogus' não é reconhecido."),
+        ):
+            result = runner.invoke(
+                app, ["describe", "--provider", "bogus", "um", "agent", "qualquer"]
+            )
+
+        assert result.exit_code == 1
+        assert "bogus" in result.output
 
 
 def test_describe_skips_custom_tool_colliding_with_builtin_tool_name():

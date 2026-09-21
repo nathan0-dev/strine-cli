@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 
 from strine.cli import app
 from strine.runtime import AgentRuntimeError
+from tests.fakes import FakeProvider
 from tests.test_cli_describe import isolated_filesystem
 
 runner = CliRunner()
@@ -14,6 +15,7 @@ _AGENT_JSON = {
     "prompt": "You are helpful.",
     "tools": ["sql"],
     "custom_tools": [],
+    "provider": "claude",
 }
 
 
@@ -54,13 +56,10 @@ def test_run_missing_api_key_shows_friendly_error_and_exits_1():
 
 
 def test_run_executes_turn_and_exits_on_sair():
-    from unittest.mock import MagicMock
     with isolated_filesystem():
         _write_agent_json()
-        mock_provider = MagicMock()
-        mock_provider.api_key = "sk-ant-fake"
         with (
-            patch("strine.cli.get_provider", return_value=mock_provider),
+            patch("strine.cli.get_provider", return_value=FakeProvider()),
             patch(
                 "strine.cli.prepare_agent_tools",
                 return_value=([], {}, []),
@@ -79,13 +78,10 @@ def test_run_executes_turn_and_exits_on_sair():
 
 
 def test_run_prints_warnings_from_prepare_agent_tools():
-    from unittest.mock import MagicMock
     with isolated_filesystem():
         _write_agent_json()
-        mock_provider = MagicMock()
-        mock_provider.api_key = "sk-ant-fake"
         with (
-            patch("strine.cli.get_provider", return_value=mock_provider),
+            patch("strine.cli.get_provider", return_value=FakeProvider()),
             patch(
                 "strine.cli.prepare_agent_tools",
                 return_value=([], {}, ["Tool 'ghost' não pôde ser carregada."]),
@@ -98,13 +94,10 @@ def test_run_prints_warnings_from_prepare_agent_tools():
 
 
 def test_run_handles_agent_runtime_error_without_crashing_repl():
-    from unittest.mock import MagicMock
     with isolated_filesystem():
         _write_agent_json()
-        mock_provider = MagicMock()
-        mock_provider.api_key = "sk-ant-fake"
         with (
-            patch("strine.cli.get_provider", return_value=mock_provider),
+            patch("strine.cli.get_provider", return_value=FakeProvider()),
             patch("strine.cli.prepare_agent_tools", return_value=([], {}, [])),
             patch(
                 "strine.cli.run_agent",
@@ -117,3 +110,37 @@ def test_run_handles_agent_runtime_error_without_crashing_repl():
 
     assert result.exit_code == 0
     assert "API fora do ar" in result.output
+
+
+def test_run_uses_provider_stored_in_agent_json():
+    agent_with_gemini = dict(_AGENT_JSON, provider="gemini")
+    with isolated_filesystem():
+        with open("test-agent.json", "w") as f:
+            json.dump(agent_with_gemini, f)
+
+        with (
+            patch("strine.cli.get_provider", return_value=FakeProvider()) as mock_get_provider,
+            patch("strine.cli.prepare_agent_tools", return_value=([], {}, [])),
+            patch("strine.cli.run_agent", return_value="oi"),
+        ):
+            result = runner.invoke(app, ["run", "./test-agent.json"], input="sair\n")
+
+        assert result.exit_code == 0
+        mock_get_provider.assert_called_once_with("gemini")
+
+
+def test_run_defaults_to_claude_when_agent_json_has_no_provider_key():
+    agent_without_provider = {k: v for k, v in _AGENT_JSON.items() if k != "provider"}
+    with isolated_filesystem():
+        with open("test-agent.json", "w") as f:
+            json.dump(agent_without_provider, f)
+
+        with (
+            patch("strine.cli.get_provider", return_value=FakeProvider()) as mock_get_provider,
+            patch("strine.cli.prepare_agent_tools", return_value=([], {}, [])),
+            patch("strine.cli.run_agent", return_value="oi"),
+        ):
+            result = runner.invoke(app, ["run", "./test-agent.json"], input="sair\n")
+
+        assert result.exit_code == 0
+        mock_get_provider.assert_called_once_with("claude")

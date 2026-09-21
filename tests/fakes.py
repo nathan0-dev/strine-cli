@@ -16,10 +16,12 @@ class FakeProvider(Provider):
 
     name = "fake"
 
-    def __init__(self, responses=None, raise_error=None):
+    def __init__(self, responses=None, raise_error=None, name_override=None):
         self._responses = list(responses or [])
         self._raise_error = raise_error
         self.calls = []  # cada chamada a create_message fica registrada aqui
+        if name_override is not None:
+            self.name = name_override
 
     def build_user_message(self, text: str) -> dict:
         return {"role": "user", "text": text}
