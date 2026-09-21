@@ -129,3 +129,186 @@ def test_generate_custom_tool_raises_when_no_tool_call_returned():
 
     with pytest.raises(CustomToolError):
         generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_rejects_execute_as_nested_function():
+    """Test that execute defined as a nested function is rejected."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "nested_func_tool",
+                "Tool com execute aninhada.",
+                {"type": "object", "properties": {}},
+                "def helper():\n    def execute(**kwargs):\n        return 'nested'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_rejects_async_execute():
+    """Test that async def execute is rejected (only sync functions allowed)."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "async_tool",
+                "Tool com async execute.",
+                {"type": "object", "properties": {}},
+                "async def execute(**kwargs):\n    return 'async'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_accepts_valid_module_level_execute():
+    """Test that a valid module-level execute function is correctly accepted."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "valid_tool",
+                "Tool válida.",
+                {
+                    "type": "object",
+                    "properties": {"x": {"type": "string"}},
+                    "required": ["x"],
+                },
+                "def execute(x):\n    return f'result: {x}'\n",
+            )
+        ]
+    )
+
+    spec = generate_custom_tool("qualquer coisa", provider)
+
+    assert isinstance(spec, CustomToolSpec)
+    assert spec.name == "valid_tool"
+    assert spec.code == "def execute(x):\n    return f'result: {x}'\n"
+
+
+def test_generate_custom_tool_rejects_name_with_forward_slash():
+    """Test that a name containing forward slash is rejected."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "foo/bar",
+                "Tool with slash.",
+                {"type": "object", "properties": {}},
+                "def execute():\n    return 'result'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_rejects_name_with_space():
+    """Test that a name containing spaces is rejected."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "tool with spaces",
+                "Tool with spaces.",
+                {"type": "object", "properties": {}},
+                "def execute():\n    return 'result'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_rejects_name_with_uppercase():
+    """Test that a name containing uppercase letters is rejected (per slug convention)."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "ParseInvoice",
+                "Tool with uppercase.",
+                {"type": "object", "properties": {}},
+                "def execute():\n    return 'result'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_accepts_valid_slug_with_underscores_and_hyphens():
+    """Test that valid slug names with underscores and hyphens are accepted."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "parse_invoice-total",
+                "Valid slug tool.",
+                {
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
+                "def execute(text):\n    return 'result'\n",
+            )
+        ]
+    )
+
+    spec = generate_custom_tool("qualquer coisa", provider)
+
+    assert isinstance(spec, CustomToolSpec)
+    assert spec.name == "parse_invoice-total"
+
+
+def test_generate_custom_tool_rejects_input_schema_not_a_dict():
+    """Test that a non-dict input_schema is rejected."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "bad_schema_tool",
+                "Tool with malformed schema.",
+                "not a dict",
+                "def execute():\n    return 'result'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_rejects_input_schema_without_properties():
+    """Test that an input_schema missing a dict 'properties' is rejected."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "bad_schema_tool",
+                "Tool with malformed schema.",
+                {"type": "object"},
+                "def execute():\n    return 'result'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
+
+
+def test_generate_custom_tool_rejects_empty_name():
+    """Test that an empty name is rejected."""
+    provider = FakeProvider(
+        responses=[
+            _tool_response(
+                "",
+                "Tool with empty name.",
+                {"type": "object", "properties": {}},
+                "def execute():\n    return 'result'\n",
+            )
+        ]
+    )
+
+    with pytest.raises(CustomToolError):
+        generate_custom_tool("qualquer coisa", provider)
