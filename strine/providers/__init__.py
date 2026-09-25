@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -6,15 +7,26 @@ from strine.config import MissingAPIKeyError
 from strine.providers.base import Provider
 from strine.providers.claude import ClaudeProvider
 from strine.providers.gemini import GeminiProvider
+from strine.providers.openai_compatible import (
+    GroqProvider,
+    OpenAIProvider,
+    OpenRouterProvider,
+)
 
 PROVIDERS = {
     "claude": ClaudeProvider,
     "gemini": GeminiProvider,
+    "gpt": OpenAIProvider,
+    "groq": GroqProvider,
+    "openrouter": OpenRouterProvider,
 }
 
 _PROVIDER_ENV_VARS = {
     "claude": "ANTHROPIC_API_KEY",
     "gemini": "GEMINI_API_KEY",
+    "gpt": "OPENAI_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
 }
 
 DEFAULT_PROVIDER = os.getenv("STRINE_DEFAULT_PROVIDER", "claude")
@@ -24,8 +36,11 @@ class UnknownProviderError(RuntimeError):
     pass
 
 
-def get_provider(name: str) -> Provider:
+def get_provider(name: str, model: Optional[str] = None) -> Provider:
     """Instancia o provider certo, já com a API key carregada do .env.
+
+    model, se passado, sobrescreve o modelo padrão daquele provider —
+    essencial pro OpenRouter, que roteia pra centenas de modelos.
 
     usecwd=True: resolve o .env a partir do diretório onde o usuário RODOU
     o strine, não de onde o pacote está instalado (mesma proteção que
@@ -52,4 +67,4 @@ def get_provider(name: str) -> Provider:
         )
 
     provider_cls = PROVIDERS[name]
-    return provider_cls(api_key=api_key)
+    return provider_cls(api_key=api_key, model=model)

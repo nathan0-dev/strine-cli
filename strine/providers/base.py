@@ -23,6 +23,10 @@ class ProviderError(RuntimeError):
 
 class Provider(ABC):
     name: str
+    # Modelo efetivamente em uso (o padrão do provider, ou o que veio pelo
+    # --model). É público porque o agent.json grava esse valor resolvido,
+    # deixando o agent reproduzível mesmo que o padrão mude depois.
+    model: str
 
     @abstractmethod
     def build_user_message(self, text: str) -> Any:
@@ -47,7 +51,12 @@ class Provider(ABC):
         nativo do provider, pra ser anexado ao histórico."""
 
     @abstractmethod
-    def build_tool_result_message(self, tool_results: list) -> Any:
+    def build_tool_result_messages(self, tool_results: list) -> List[Any]:
         """tool_results: lista de {"tool_call_id": str, "name": str,
-        "content": str}. Monta o turno de resultado de tool no formato
-        nativo do provider."""
+        "content": str}. Monta o(s) turno(s) de resultado de tool no
+        formato nativo do provider.
+
+        Retorna uma LISTA porque os formatos divergem: Claude e Gemini
+        agrupam todos os resultados num único turno, enquanto o formato
+        OpenAI exige uma mensagem {"role": "tool"} separada por
+        resultado. Quem chama faz extend(), não append()."""

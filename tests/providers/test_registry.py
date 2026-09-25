@@ -6,18 +6,70 @@ from strine.config import MissingAPIKeyError
 from strine.providers import PROVIDERS, UnknownProviderError, get_provider
 from strine.providers.claude import ClaudeProvider
 from strine.providers.gemini import GeminiProvider
+from strine.providers.openai_compatible import (
+    GroqProvider,
+    OpenAIProvider,
+    OpenRouterProvider,
+)
 
 
-def test_providers_registry_has_claude_and_gemini():
-    assert PROVIDERS == {"claude": ClaudeProvider, "gemini": GeminiProvider}
+def test_providers_registry_has_all_five_providers():
+    assert PROVIDERS == {
+        "claude": ClaudeProvider,
+        "gemini": GeminiProvider,
+        "gpt": OpenAIProvider,
+        "groq": GroqProvider,
+        "openrouter": OpenRouterProvider,
+    }
 
 
-def test_get_provider_unknown_name_raises_friendly_error():
+def test_get_provider_unknown_name_lists_every_valid_provider():
     with pytest.raises(UnknownProviderError) as exc_info:
         get_provider("bogus")
 
-    assert "claude" in str(exc_info.value)
-    assert "gemini" in str(exc_info.value)
+    message = str(exc_info.value)
+    for name in ("claude", "gemini", "gpt", "groq", "openrouter"):
+        assert name in message
+
+
+@pytest.mark.parametrize(
+    "provider_name,env_var",
+    [
+        ("gpt", "OPENAI_API_KEY"),
+        ("groq", "GROQ_API_KEY"),
+        ("openrouter", "OPENROUTER_API_KEY"),
+    ],
+)
+def test_openai_compatible_providers_use_their_own_env_var(
+    provider_name, env_var, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(env_var, raising=False)
+
+    with pytest.raises(MissingAPIKeyError) as exc_info:
+        get_provider(provider_name)
+
+    assert env_var in str(exc_info.value)
+
+
+def test_get_provider_passes_model_through_to_the_provider(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-fake")
+
+    with patch("strine.providers.openai_compatible.openai.OpenAI"):
+        provider = get_provider("openrouter", model="meta-llama/llama-3.3-70b")
+
+    assert provider.model == "meta-llama/llama-3.3-70b"
+
+
+def test_get_provider_without_model_uses_the_provider_default(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-fake")
+
+    with patch("strine.providers.openai_compatible.openai.OpenAI"):
+        provider = get_provider("groq")
+
+    assert provider.model == GroqProvider.default_model
 
 
 def test_get_provider_claude_uses_anthropic_api_key(tmp_path, monkeypatch):

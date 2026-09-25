@@ -11,7 +11,7 @@ class ClaudeProvider(Provider):
 
     def __init__(self, api_key: str, model: Optional[str] = None):
         self._client = anthropic.Anthropic(api_key=api_key)
-        self._model = model or DEFAULT_MODEL
+        self.model = model or DEFAULT_MODEL
 
     def build_user_message(self, text: str) -> dict:
         return {"role": "user", "content": text}
@@ -24,7 +24,7 @@ class ClaudeProvider(Provider):
         force_tool: Optional[str] = None,
     ) -> NormalizedResponse:
         kwargs = {
-            "model": self._model,
+            "model": self.model,
             "max_tokens": 2048,
             "system": system_prompt,
             "messages": messages,
@@ -68,15 +68,18 @@ class ClaudeProvider(Provider):
             )
         return {"role": "assistant", "content": content}
 
-    def build_tool_result_message(self, tool_results: list) -> dict:
-        return {
-            "role": "user",
-            "content": [
-                {
-                    "type": "tool_result",
-                    "tool_use_id": result["tool_call_id"],
-                    "content": result["content"],
-                }
-                for result in tool_results
-            ],
-        }
+    def build_tool_result_messages(self, tool_results: list) -> list:
+        # Claude agrupa todos os resultados num único turno 'user'.
+        return [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": result["tool_call_id"],
+                        "content": result["content"],
+                    }
+                    for result in tool_results
+                ],
+            }
+        ]

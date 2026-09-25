@@ -18,7 +18,7 @@ def test_valid_tools_includes_all_eight():
     }
 
 
-def test_agent_config_to_dict_includes_provider_and_custom_tools_defaults():
+def test_agent_config_to_dict_includes_provider_model_and_custom_tools_defaults():
     config = AgentConfig(name="foo", prompt="bar", tools=["sql"])
     assert config.to_dict() == {
         "name": "foo",
@@ -26,7 +26,19 @@ def test_agent_config_to_dict_includes_provider_and_custom_tools_defaults():
         "tools": ["sql"],
         "custom_tools": [],
         "provider": "claude",
+        "model": None,
     }
+
+
+def test_plan_agent_records_the_resolved_model_from_the_provider():
+    """O agent.json grava o modelo que foi de fato usado, não None — assim
+    o agent continua reproduzível se o padrão do provider mudar depois."""
+    provider = FakeProvider(responses=[_plan_response("my-agent", [])])
+    provider.model = "llama-3.3-70b-versatile"
+
+    config = plan_agent("descrição qualquer", provider)
+
+    assert config.model == "llama-3.3-70b-versatile"
 
 
 def _plan_response(name, tools, prompt="You are helpful."):

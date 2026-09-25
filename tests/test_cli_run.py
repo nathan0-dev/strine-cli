@@ -126,7 +126,7 @@ def test_run_uses_provider_stored_in_agent_json():
             result = runner.invoke(app, ["run", "./test-agent.json"], input="sair\n")
 
         assert result.exit_code == 0
-        mock_get_provider.assert_called_once_with("gemini")
+        mock_get_provider.assert_called_once_with("gemini", model=None)
 
 
 def test_run_defaults_to_claude_when_agent_json_has_no_provider_key():
@@ -143,4 +143,39 @@ def test_run_defaults_to_claude_when_agent_json_has_no_provider_key():
             result = runner.invoke(app, ["run", "./test-agent.json"], input="sair\n")
 
         assert result.exit_code == 0
-        mock_get_provider.assert_called_once_with("claude")
+        mock_get_provider.assert_called_once_with("claude", model=None)
+
+
+def test_run_passes_model_from_agent_json_to_get_provider():
+    agent_with_model = dict(_AGENT_JSON, provider="groq", model="llama-3.3-70b-versatile")
+    with isolated_filesystem():
+        with open("test-agent.json", "w") as f:
+            json.dump(agent_with_model, f)
+
+        with (
+            patch("strine.cli.get_provider", return_value=FakeProvider()) as mock_get_provider,
+            patch("strine.cli.prepare_agent_tools", return_value=([], {}, [])),
+            patch("strine.cli.run_agent", return_value="oi"),
+        ):
+            result = runner.invoke(app, ["run", "./test-agent.json"], input="sair\n")
+
+        assert result.exit_code == 0
+        mock_get_provider.assert_called_once_with("groq", model="llama-3.3-70b-versatile")
+
+
+def test_run_handles_agent_json_without_model_key():
+    """agent.json criado antes da flag --model existir continua rodando."""
+    legacy = {k: v for k, v in _AGENT_JSON.items() if k != "model"}
+    with isolated_filesystem():
+        with open("test-agent.json", "w") as f:
+            json.dump(legacy, f)
+
+        with (
+            patch("strine.cli.get_provider", return_value=FakeProvider()) as mock_get_provider,
+            patch("strine.cli.prepare_agent_tools", return_value=([], {}, [])),
+            patch("strine.cli.run_agent", return_value="oi"),
+        ):
+            result = runner.invoke(app, ["run", "./test-agent.json"], input="sair\n")
+
+        assert result.exit_code == 0
+        mock_get_provider.assert_called_once_with("claude", model=None)

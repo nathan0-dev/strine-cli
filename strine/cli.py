@@ -1,7 +1,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -33,7 +33,12 @@ def describe_agent(
     provider_name: str = typer.Option(
         DEFAULT_PROVIDER,
         "--provider",
-        help="Provider de IA a usar (claude, gemini).",
+        help="Provider de IA a usar (claude, gemini, gpt, groq, openrouter).",
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Modelo específico a usar. Sem isso, usa o padrão do provider.",
     ),
 ) -> None:
     """Cria um novo agent a partir de uma descrição em linguagem natural."""
@@ -41,7 +46,7 @@ def describe_agent(
     text = " ".join(description)
 
     try:
-        provider = get_provider(provider_name)
+        provider = get_provider(provider_name, model=model)
     except UnknownProviderError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)
@@ -141,7 +146,7 @@ def run(
 
     provider_name = agent_config.get("provider", "claude")
     try:
-        provider = get_provider(provider_name)
+        provider = get_provider(provider_name, model=agent_config.get("model"))
     except (UnknownProviderError, MissingAPIKeyError) as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1)

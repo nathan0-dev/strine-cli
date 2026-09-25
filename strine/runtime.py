@@ -113,7 +113,7 @@ def run_agent(
                 {"tool_call_id": call.id, "name": call.name, "content": result_text}
             )
 
-        messages.append(provider.build_tool_result_message(tool_results))
+        messages.extend(provider.build_tool_result_messages(tool_results))
         rounds += 1
 
         try:

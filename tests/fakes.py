@@ -44,5 +44,5 @@ class FakeProvider(Provider):
     def build_assistant_message(self, response: NormalizedResponse) -> dict:
         return {"role": "assistant", "tool_calls": list(response.tool_calls), "text": response.text}
 
-    def build_tool_result_message(self, tool_results: list) -> dict:
-        return {"role": "tool_result", "results": list(tool_results)}
+    def build_tool_result_messages(self, tool_results: list) -> list:
+        return [{"role": "tool_result", "results": list(tool_results)}]

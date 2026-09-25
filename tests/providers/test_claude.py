@@ -110,15 +110,27 @@ def test_build_assistant_message_includes_text_and_tool_calls():
     } in message["content"]
 
 
-def test_build_tool_result_message_shape():
+def test_build_tool_result_messages_groups_all_results_into_one_turn():
+    """Claude agrupa todos os resultados de tool num único turno 'user' —
+    diferente do formato OpenAI, que exige uma mensagem por resultado. Daí
+    o contrato retornar uma lista: cada provider decide quantas mensagens
+    seu formato nativo precisa."""
     with patch("strine.providers.claude.anthropic.Anthropic"):
         provider = ClaudeProvider(api_key="sk-ant-fake")
 
-    message = provider.build_tool_result_message(
-        [{"tool_call_id": "toolu_1", "name": "query_database", "content": "42"}]
+    messages = provider.build_tool_result_messages(
+        [
+            {"tool_call_id": "toolu_1", "name": "query_database", "content": "42"},
+            {"tool_call_id": "toolu_2", "name": "web_search", "content": "resultado"},
+        ]
     )
 
-    assert message == {
-        "role": "user",
-        "content": [{"type": "tool_result", "tool_use_id": "toolu_1", "content": "42"}],
-    }
+    assert messages == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": "toolu_1", "content": "42"},
+                {"type": "tool_result", "tool_use_id": "toolu_2", "content": "resultado"},
+            ],
+        }
+    ]

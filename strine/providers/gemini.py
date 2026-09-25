@@ -6,7 +6,7 @@ from google.genai import types
 
 from strine.providers.base import NormalizedResponse, Provider, ProviderError, ToolCall
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
 
 class GeminiProvider(Provider):
@@ -14,7 +14,7 @@ class GeminiProvider(Provider):
 
     def __init__(self, api_key: str, model: Optional[str] = None):
         self._client = genai.Client(api_key=api_key)
-        self._model = model or DEFAULT_GEMINI_MODEL
+        self.model = model or DEFAULT_GEMINI_MODEL
         # Ids que a Gemini API não populou em FunctionCall.id e que nós
         # inventamos só pra correlação interna (runtime.py). Nunca devem
         # ser reenviados pra API como se fossem ids nativos dela.
@@ -53,7 +53,7 @@ class GeminiProvider(Provider):
 
         try:
             response = self._client.models.generate_content(
-                model=self._model,
+                model=self.model,
                 contents=messages,
                 config=types.GenerateContentConfig(**config_kwargs),
             )
@@ -109,7 +109,8 @@ class GeminiProvider(Provider):
             )
         return types.Content(role="model", parts=parts)
 
-    def build_tool_result_message(self, tool_results: list) -> types.Content:
+    def build_tool_result_messages(self, tool_results: list) -> list:
+        # Gemini agrupa todos os function_response num único Content.
         parts = []
         for result in tool_results:
             call_id = result["tool_call_id"]
@@ -123,4 +124,4 @@ class GeminiProvider(Provider):
                     )
                 )
             )
-        return types.Content(role="user", parts=parts)
+        return [types.Content(role="user", parts=parts)]

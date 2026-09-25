@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 from strine.providers.base import Provider, ProviderError
 
@@ -72,6 +72,7 @@ class AgentConfig:
     tools: List[str] = field(default_factory=list)
     custom_tools: List[dict] = field(default_factory=list)
     provider: str = "claude"
+    model: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -80,6 +81,7 @@ class AgentConfig:
             "tools": self.tools,
             "custom_tools": self.custom_tools,
             "provider": self.provider,
+            "model": self.model,
         }
 
 
@@ -130,5 +132,9 @@ def plan_agent(description: str, provider: Provider) -> AgentConfig:
     _validate_name(plan["name"])
 
     return AgentConfig(
-        name=plan["name"], prompt=plan["prompt"], tools=tools, provider=provider.name
+        name=plan["name"],
+        prompt=plan["prompt"],
+        tools=tools,
+        provider=provider.name,
+        model=getattr(provider, "model", None),
     )

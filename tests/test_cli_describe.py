@@ -110,7 +110,7 @@ def test_describe_passes_selected_provider_to_get_provider():
             )
 
         assert result.exit_code == 0
-        mock_get_provider.assert_called_once_with("gemini")
+        mock_get_provider.assert_called_once_with("gemini", model=None)
 
 
 def test_describe_unknown_provider_shows_friendly_error():
@@ -171,3 +171,37 @@ def test_describe_handles_custom_tool_generation_failure_gracefully():
         assert result.exit_code == 0
         saved = json.loads(open("test-agent.json").read())
         assert saved["custom_tools"] == []
+
+
+def test_describe_passes_model_flag_to_get_provider():
+    with isolated_filesystem():
+        patch_key, patch_plan = _patch_common()
+        with patch_key as mock_get_provider, patch_plan:
+            result = runner.invoke(
+                app,
+                [
+                    "describe",
+                    "--provider",
+                    "openrouter",
+                    "--model",
+                    "meta-llama/llama-3.3-70b",
+                    "um",
+                    "agent",
+                ],
+                input="\n",
+            )
+
+        assert result.exit_code == 0
+        mock_get_provider.assert_called_once_with(
+            "openrouter", model="meta-llama/llama-3.3-70b"
+        )
+
+
+def test_describe_without_model_flag_passes_none():
+    with isolated_filesystem():
+        patch_key, patch_plan = _patch_common()
+        with patch_key as mock_get_provider, patch_plan:
+            result = runner.invoke(app, ["describe", "um", "agent"], input="\n")
+
+        assert result.exit_code == 0
+        assert mock_get_provider.call_args.kwargs["model"] is None

@@ -99,15 +99,16 @@ def test_create_message_wraps_api_error():
             provider.create_message("system", [provider.build_user_message("oi")])
 
 
-def test_build_tool_result_message_wraps_content_in_output_dict():
+def test_build_tool_result_messages_wraps_content_in_output_dict():
     with patch("strine.providers.gemini.genai.Client"):
         provider = GeminiProvider(api_key="fake-gemini-key")
 
-    message = provider.build_tool_result_message(
+    messages = provider.build_tool_result_messages(
         [{"tool_call_id": "call_abc", "name": "query_database", "content": "42"}]
     )
 
-    part = message.parts[0]
+    assert len(messages) == 1
+    part = messages[0].parts[0]
     assert part.function_response.id == "call_abc"
     assert part.function_response.name == "query_database"
     assert part.function_response.response == {"output": "42"}
@@ -128,10 +129,10 @@ def test_native_tool_call_id_round_trips_into_wire_messages():
     assistant_message = provider.build_assistant_message(response)
     assert assistant_message.parts[0].function_call.id == "call_abc"
 
-    tool_result_message = provider.build_tool_result_message(
+    tool_result_messages = provider.build_tool_result_messages(
         [{"tool_call_id": "call_abc", "name": "query_database", "content": "42"}]
     )
-    assert tool_result_message.parts[0].function_response.id == "call_abc"
+    assert tool_result_messages[0].parts[0].function_response.id == "call_abc"
 
 
 def test_synthetic_tool_call_id_is_not_echoed_back_to_the_wire():
@@ -152,10 +153,10 @@ def test_synthetic_tool_call_id_is_not_echoed_back_to_the_wire():
     assistant_message = provider.build_assistant_message(response)
     assert assistant_message.parts[0].function_call.id is None
 
-    tool_result_message = provider.build_tool_result_message(
+    tool_result_messages = provider.build_tool_result_messages(
         [{"tool_call_id": "call_0", "name": "query_database", "content": "42"}]
     )
-    assert tool_result_message.parts[0].function_response.id is None
+    assert tool_result_messages[0].parts[0].function_response.id is None
 
 
 def test_create_message_raises_provider_error_on_empty_candidates():
