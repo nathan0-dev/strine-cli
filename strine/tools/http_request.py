@@ -34,7 +34,7 @@ HTTP_REQUEST_SCHEMA = {
     },
 }
 
-_MAX_RESPONSE_CHARS = 2000
+_MAX_RESPONSE_CHARS = 8000
 
 
 def execute(

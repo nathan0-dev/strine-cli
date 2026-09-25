@@ -131,7 +131,7 @@ class OpenAIProvider(OpenAICompatibleProvider):
 class GroqProvider(OpenAICompatibleProvider):
     name = "groq"
     base_url = "https://api.groq.com/openai/v1"
-    default_model = "llama-3.3-70b-versatile"
+    default_model = "openai/gpt-oss-120b"
 
 
 class OpenRouterProvider(OpenAICompatibleProvider):

@@ -40,11 +40,11 @@ def test_post_request_with_headers_and_body():
 
 
 def test_long_response_body_is_truncated():
-    fake_response = Mock(status_code=200, text="x" * 5000)
+    fake_response = Mock(status_code=200, text="x" * 20000)
     with patch("strine.tools.http_request.requests.request", return_value=fake_response):
         result = execute(method="GET", url="https://api.example.com/big")
 
-    assert len(result) < 5000
+    assert len(result) < 20000
 
 
 def test_connection_error_returns_friendly_string():
