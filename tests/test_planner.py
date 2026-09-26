@@ -133,3 +133,60 @@ def test_plan_agent_forces_the_create_agent_plan_tool():
     plan_agent("descrição qualquer", provider)
 
     assert provider.calls[0]["force_tool"] == "create_agent_plan"
+
+
+# --- fixed_tools: o usuário decidiu as tools, o prompt precisa ser coerente ---
+
+
+def test_plan_agent_with_fixed_tools_overrides_what_the_model_chose():
+    provider = FakeProvider(responses=[_plan_response("my-agent", ["sql"])])
+
+    config = plan_agent(
+        "descrição qualquer", provider, fixed_tools=["http_request", "file_read"]
+    )
+
+    assert config.tools == ["http_request", "file_read"]
+
+
+def test_plan_agent_with_empty_fixed_tools_means_no_tools():
+    provider = FakeProvider(responses=[_plan_response("my-agent", ["sql"])])
+
+    config = plan_agent("descrição qualquer", provider, fixed_tools=[])
+
+    assert config.tools == []
+
+
+def test_plan_agent_fixed_tools_ignores_names_outside_the_catalog():
+    provider = FakeProvider(responses=[_plan_response("my-agent", [])])
+
+    config = plan_agent("descrição qualquer", provider, fixed_tools=["sql", "bogus"])
+
+    assert config.tools == ["sql"]
+
+
+def test_plan_agent_tells_the_model_which_tools_the_user_chose():
+    """Sem isso o prompt gerado pode continuar dizendo "não use ferramentas"
+    mesmo depois do usuário ter adicionado tools."""
+    provider = FakeProvider(responses=[_plan_response("my-agent", [])])
+
+    plan_agent("um agent de pesquisa", provider, fixed_tools=["web_search"])
+
+    sent = provider.calls[0]["messages"][0]["text"]
+    assert "um agent de pesquisa" in sent
+    assert "web_search" in sent
+
+
+def test_plan_agent_with_empty_fixed_tools_tells_the_model_there_are_none():
+    provider = FakeProvider(responses=[_plan_response("my-agent", [])])
+
+    plan_agent("um agent qualquer", provider, fixed_tools=[])
+
+    assert "nenhuma" in provider.calls[0]["messages"][0]["text"].lower()
+
+
+def test_plan_agent_without_fixed_tools_sends_the_description_untouched():
+    provider = FakeProvider(responses=[_plan_response("my-agent", [])])
+
+    plan_agent("descrição qualquer", provider)
+
+    assert provider.calls[0]["messages"][0]["text"] == "descrição qualquer"

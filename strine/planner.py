@@ -107,16 +107,41 @@ def _validate_name(name: str) -> None:
         )
 
 
-def plan_agent(description: str, provider: Provider) -> AgentConfig:
+def _describe_user_tool_choice(fixed_tools: List[str]) -> str:
+    listed = ", ".join(fixed_tools) if fixed_tools else "nenhuma"
+    return (
+        "\n\n[Decisão do usuário: o agent deve usar EXATAMENTE estas tools: "
+        f"{listed}. Escreva o system prompt coerente com essa lista — se for "
+        "'nenhuma', o agent não tem ferramentas; se houver tools, o prompt "
+        "deve dizer que ele as usa quando precisar. Não mencione tools fora "
+        "da lista.]"
+    )
+
+
+def plan_agent(
+    description: str,
+    provider: Provider,
+    fixed_tools: Optional[List[str]] = None,
+) -> AgentConfig:
     """Chama o provider pra decidir tools + system prompt + nome do agent.
 
     Usa tool use forçado (force_tool) em vez de pedir "responda em JSON" e
     fazer parsing manual — o schema garante o formato da resposta.
+
+    fixed_tools, se passado, é a decisão final do usuário (ex: depois de
+    ver o catálogo e trocar a sugestão): o modelo escreve o prompt já sabendo
+    dessas tools, e elas — não o que o modelo escolheria — vão pro resultado.
+    Sem isso o prompt poderia continuar dizendo "não use ferramentas" mesmo
+    depois do usuário ter adicionado uma.
     """
+    user_text = description
+    if fixed_tools is not None:
+        user_text += _describe_user_tool_choice(fixed_tools)
+
     try:
         response = provider.create_message(
             system_prompt=SYSTEM_PROMPT,
-            messages=[provider.build_user_message(description)],
+            messages=[provider.build_user_message(user_text)],
             tools=[AGENT_PLAN_TOOL],
             force_tool="create_agent_plan",
         )
@@ -127,7 +152,8 @@ def plan_agent(description: str, provider: Provider) -> AgentConfig:
         raise PlannerError("O modelo não retornou um plano estruturado.")
 
     plan = response.tool_calls[0].input
-    tools = [t for t in plan.get("tools", []) if t in VALID_TOOLS]
+    chosen = plan.get("tools", []) if fixed_tools is None else fixed_tools
+    tools = [t for t in chosen if t in VALID_TOOLS]
 
     _validate_name(plan["name"])
 

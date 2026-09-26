@@ -52,3 +52,18 @@ def test_schema_name_vs_registry_key_documented_reality():
         "file_read",
         "file_write",
     }
+
+
+def test_requires_env_documents_which_credentials_each_tool_needs():
+    """requires_env é a fonte única de verdade sobre credenciais: o catálogo
+    do `strine describe` / `strine tools` usa isso pra avisar o que falta."""
+    assert {key: entry["requires_env"] for key, entry in TOOLS.items()} == {
+        "sql": ["DATABASE_URL"],
+        "slack": ["SLACK_BOT_TOKEN"],
+        "webhook": [],
+        "http_request": [],
+        "web_search": ["TAVILY_API_KEY"],
+        "send_email": ["RESEND_API_KEY"],
+        "file_read": [],
+        "file_write": [],
+    }

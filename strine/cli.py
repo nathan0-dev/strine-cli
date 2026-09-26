@@ -7,12 +7,14 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rich.table import Table
 
-from strine.config import MissingAPIKeyError
+from strine.config import MissingAPIKeyError, load_project_env
 from strine.custom_tools import CustomToolError, generate_custom_tool
 from strine.planner import PlannerError, plan_agent
 from strine.providers import DEFAULT_PROVIDER, UnknownProviderError, get_provider
 from strine.runtime import AgentRuntimeError, prepare_agent_tools, run_agent
+from strine.tool_catalog import missing_env_vars, parse_tool_selection, required_env_vars
 from strine.tools import TOOLS
 
 _EXIT_WORDS = {"sair", "exit"}
@@ -21,7 +23,68 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 # Nomes que devem ser tratados como subcomando explícito, nunca como início
 # de uma descrição em linguagem natural.
-_RESERVED_FIRST_TOKENS = {"run", "describe", "--help", "-h"}
+_RESERVED_FIRST_TOKENS = {"run", "describe", "tools", "--help", "-h"}
+
+
+def _render_catalog(console: Console, selected: Optional[List[str]] = None) -> None:
+    """Mostra todas as tools prontas. Com `selected`, marca (✓) as escolhidas."""
+    show_marks = selected is not None
+    table = Table(title="Tools disponíveis", title_justify="left")
+    if show_marks:
+        table.add_column("", no_wrap=True)
+    table.add_column("Tool", style="cyan", no_wrap=True)
+    table.add_column("O que faz", overflow="fold")
+    table.add_column("Credencial", no_wrap=True)
+
+    for key, entry in TOOLS.items():
+        missing = missing_env_vars(key)
+        if not required_env_vars(key):
+            credential = "[dim]—[/dim]"
+        elif missing:
+            credential = f"[yellow]falta {', '.join(missing)}[/yellow]"
+        else:
+            credential = "[green]ok[/green]"
+
+        row = [key, entry["schema"]["description"], credential]
+        if show_marks:
+            row.insert(0, "[bold green]✓[/bold green]" if key in selected else "")
+        table.add_row(*row)
+
+    console.print(table)
+
+
+def _prompt_tool_selection(console: Console, suggested: List[str]) -> List[str]:
+    """Pergunta quais tools o agent deve usar. Enter mantém a sugestão."""
+    while True:
+        raw = typer.prompt(
+            "\nTools do agent — Enter mantém as marcadas (✓); ou digite os nomes "
+            "que quer, separados por vírgula ('nenhuma' pra nenhuma)",
+            default="",
+            show_default=False,
+        )
+        if not raw.strip():
+            return list(suggested)
+
+        selected, unknown = parse_tool_selection(raw, TOOLS.keys())
+        if unknown:
+            console.print(
+                f"[red]Tool desconhecida: {', '.join(unknown)}. "
+                f"Opções: {', '.join(TOOLS)}[/red]"
+            )
+            continue
+        return selected
+
+
+@app.command(name="tools")
+def list_tools() -> None:
+    """Lista as tools que já vêm prontas e quais credenciais faltam."""
+    load_project_env()
+    console = Console()
+    _render_catalog(console)
+    console.print(
+        "\n[dim]Ao criar um agent, você escolhe entre elas ou descreve uma "
+        "tool nova.[/dim]"
+    )
 
 
 @app.command(name="describe", hidden=True)
@@ -45,6 +108,10 @@ def describe_agent(
     console = Console()
     text = " ".join(description)
 
+    # O catálogo mostra o que falta no .env — precisa estar carregado antes,
+    # independente de como o provider for resolvido.
+    load_project_env()
+
     try:
         provider = get_provider(provider_name, model=model)
     except UnknownProviderError as exc:
@@ -61,14 +128,37 @@ def describe_agent(
         console.print(f"[red]Erro ao planejar o agent: {exc}[/red]")
         raise typer.Exit(code=1)
 
+    console.print(f"[bold green]✓[/bold green] Agent: [bold]{agent_config.name}[/bold]\n")
+    _render_catalog(console, selected=agent_config.tools)
+
+    selected_tools = _prompt_tool_selection(console, agent_config.tools)
+
+    if set(selected_tools) != set(agent_config.tools):
+        # O prompt gerado foi escrito pras tools sugeridas; se o usuário
+        # mudou a lista, o modelo reescreve já sabendo das tools finais.
+        try:
+            with console.status(
+                "[bold cyan]Ajustando o agent às tools escolhidas...[/bold cyan]"
+            ):
+                agent_config = plan_agent(text, provider, fixed_tools=selected_tools)
+        except PlannerError as exc:
+            console.print(f"[red]Erro ao ajustar o agent: {exc}[/red]")
+            raise typer.Exit(code=1)
+
     tools_label = ", ".join(agent_config.tools) or "nenhuma"
-    console.print(f"[bold green]✓[/bold green] Agent: [bold]{agent_config.name}[/bold]")
-    console.print(f"[bold green]✓[/bold green] Tools escolhidas: [cyan]{tools_label}[/cyan]")
+    console.print(f"[bold green]✓[/bold green] Tools do agent: [cyan]{tools_label}[/cyan]")
+    for key in agent_config.tools:
+        missing = missing_env_vars(key)
+        if missing:
+            console.print(
+                f"[yellow]⚠ {key} está sem {', '.join(missing)} no .env — o agent "
+                "não vai conseguir usar essa tool até você configurar.[/yellow]"
+            )
     console.print(Panel(agent_config.prompt, title="Prompt gerado", border_style="cyan"))
 
     custom_description = typer.prompt(
-        "\nQuer adicionar uma tool customizada? Descreva o que ela precisa "
-        "fazer (Enter pra pular)",
+        "\nNenhuma dessas serve? Descreva uma tool nova que o agent precisa "
+        "(Enter pra pular)",
         default="",
         show_default=False,
     )

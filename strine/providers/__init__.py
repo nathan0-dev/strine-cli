@@ -1,9 +1,7 @@
 import os
 from typing import Optional
 
-from dotenv import find_dotenv, load_dotenv
-
-from strine.config import MissingAPIKeyError
+from strine.config import MissingAPIKeyError, load_project_env
 from strine.providers.base import Provider
 from strine.providers.claude import ClaudeProvider
 from strine.providers.gemini import GeminiProvider
@@ -42,10 +40,6 @@ def get_provider(name: str, model: Optional[str] = None) -> Provider:
     model, se passado, sobrescreve o modelo padrão daquele provider —
     essencial pro OpenRouter, que roteia pra centenas de modelos.
 
-    usecwd=True: resolve o .env a partir do diretório onde o usuário RODOU
-    o strine, não de onde o pacote está instalado (mesma proteção que
-    load_api_key() já tinha). override=True: o .env do projeto tem
-    prioridade sobre uma variável de ambiente já exportada no shell.
     """
     if name not in PROVIDERS:
         valid = ", ".join(sorted(PROVIDERS))
@@ -53,7 +47,7 @@ def get_provider(name: str, model: Optional[str] = None) -> Provider:
             f"Provider '{name}' não é reconhecido. Providers disponíveis: {valid}."
         )
 
-    load_dotenv(find_dotenv(usecwd=True), override=True)
+    load_project_env()
 
     env_var = _PROVIDER_ENV_VARS[name]
     api_key = os.getenv(env_var)
