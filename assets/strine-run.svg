@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="640" viewBox="0 0 860 640" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace">
+<title>strine — bugbounty-assistant</title>
+<rect x="0.5" y="0.5" width="859" height="639" rx="10" fill="#1A1B26" stroke="#2B2D3C"/>
+<path d="M0.5 38 V10.5 a10 10 0 0 1 10 -10 H849.5 a10 10 0 0 1 10 10 V38 Z" fill="#16161E"/>
+<line x1="0" y1="38.5" x2="860" y2="38.5" stroke="#2B2D3C"/>
+<circle cx="22" cy="19" r="5" fill="#4b3a40"/><circle cx="40" cy="19" r="5" fill="#4b462f"/><circle cx="58" cy="19" r="5" fill="#30402f"/>
+<text x="430.0" y="24" fill="#565F89" font-size="12" text-anchor="middle">strine — bugbounty-assistant</text>
+<text x="28" y="70" fill="#7AA2F7" font-size="13">~/strine-cli</text>
+<text x="124" y="70" fill="#BB9AF7" font-size="13">❯</text>
+<text x="144" y="70" fill="#C0CAF5" font-size="13">strine run ./bugbounty-assistant.json</text>
+<text x="28" y="100" fill="#7DCFFF" font-size="13" xml:space="preserve">   ╭─╮ ╭─╮ ╭─╮</text>
+<text x="28" y="117" fill="#7DCFFF" font-size="13" xml:space="preserve">   │ ╰─╯ ╰─╯ │</text>
+<text x="28" y="134" fill="#7AA2F7" font-size="13" xml:space="preserve">   │  ●   ●  │</text>
+<text x="28" y="151" fill="#7AA2F7" font-size="13" xml:space="preserve">   ╰────┬────╯</text>
+<text x="28" y="168" fill="#BB9AF7" font-size="13" xml:space="preserve">      ╭─┴─╮</text>
+<text x="28" y="185" fill="#BB9AF7" font-size="13" xml:space="preserve">      │   │</text>
+<text x="28" y="202" fill="#BB9AF7" font-size="13" xml:space="preserve">      ╰───╯</text>
+<text x="230" y="108" fill="#FF9E64" font-size="13">agent</text>
+<text x="320" y="108" fill="#C0CAF5" font-size="13">bugbounty-assistant</text>
+<text x="230" y="132" fill="#FF9E64" font-size="13">provider</text>
+<text x="320" y="132" fill="#C0CAF5" font-size="13">groq · openai/gpt-oss-120b</text>
+<text x="230" y="156" fill="#FF9E64" font-size="13">tools</text>
+<text x="320" y="156" fill="#9ECE6A" font-size="13">5 selected</text>
+<text x="230" y="180" fill="#FF9E64" font-size="13">status</text>
+<text x="320" y="180" fill="#9ECE6A" font-size="13">● configured</text>
+<rect x="28" y="233" width="22" height="14" rx="2" fill="#F7768E"/>
+<rect x="55" y="233" width="22" height="14" rx="2" fill="#FF9E64"/>
+<rect x="82" y="233" width="22" height="14" rx="2" fill="#E0AF68"/>
+<rect x="109" y="233" width="22" height="14" rx="2" fill="#9ECE6A"/>
+<rect x="136" y="233" width="22" height="14" rx="2" fill="#7DCFFF"/>
+<rect x="163" y="233" width="22" height="14" rx="2" fill="#7AA2F7"/>
+<rect x="190" y="233" width="22" height="14" rx="2" fill="#BB9AF7"/>
+<rect x="217" y="233" width="22" height="14" rx="2" fill="#C0CAF5"/>
+<line x1="28" y1="269" x2="832" y2="269" stroke="#2B2D3C"/>
+<text x="28" y="297" fill="#7DCFFF" font-size="13">Tools: web_search, http_request, file_read, file_write, webhook</text>
+<text x="28" y="321" fill="#565F89" font-size="13">Type your question, or 'exit' to quit.</text>
+<text x="28" y="357" font-size="13" xml:space="preserve"><tspan fill="#FF9E64" font-weight="700">you ❯ </tspan><tspan fill="#C0CAF5">Research Shopify's bug bounty program and save a summary to </tspan><tspan fill="#E0AF68">shopify-recon.md</tspan></text>
+<text x="28" y="387" fill="#7DCFFF" font-size="11">◆</text>
+<text x="46" y="387" fill="#9ECE6A" font-size="13">using web_search</text>
+<text x="28" y="409" fill="#7DCFFF" font-size="11">◆</text>
+<text x="46" y="409" fill="#9ECE6A" font-size="13">using file_write</text>
+<text x="28" y="445" font-size="13" xml:space="preserve"><tspan fill="#7DCFFF" font-weight="700">agent ❯ </tspan><tspan fill="#C0CAF5">Saved a summary to </tspan><tspan fill="#E0AF68">shopify-recon.md</tspan><tspan fill="#C0CAF5"> — Shopify runs its program on HackerOne.</tspan></text>
+<text x="28" y="467" font-size="13" xml:space="preserve"><tspan fill="#C0CAF5">        In scope: *.shopify.com, the Shopify CLI, and the Partners API.</tspan></text>
+<text x="28" y="489" font-size="13" xml:space="preserve"><tspan fill="#C0CAF5">        Known report categories: XSS, IDOR, and auth bypass.</tspan></text>
+<text x="28" y="525" fill="#FF9E64" font-size="13" font-weight="700">you ❯</text>
+<rect x="76" y="513" width="8" height="15" fill="#C0CAF5"/>
+</svg>
