@@ -185,7 +185,7 @@ def test_run_agent_stops_after_max_tool_rounds():
 
     # initial call + 5 tool rounds = 6 chamadas totais, nunca ilimitado
     assert len(provider.calls) == 6
-    assert "limite" in result.lower()
+    assert "limit" in result.lower()
 
 
 def test_run_agent_calls_on_tool_call_callback_before_executing_tool():

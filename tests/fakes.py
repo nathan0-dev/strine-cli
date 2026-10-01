@@ -2,24 +2,25 @@ from strine.providers.base import NormalizedResponse, Provider, ProviderError
 
 
 class FakeProvider(Provider):
-    """Provider de teste: devolve respostas programadas em sequência.
+    """Test provider: returns programmed responses in sequence.
 
-    Uso:
+    Usage:
         provider = FakeProvider(responses=[
-            NormalizedResponse(stop_reason="end_turn", text="oi", tool_calls=[]),
+            NormalizedResponse(stop_reason="end_turn", text="hi", tool_calls=[]),
         ])
-        provider.create_message(...)  # devolve a primeira resposta da lista
+        provider.create_message(...)  # returns the first response in the list
 
-    Se `raise_error` for passado, create_message levanta ProviderError em
-    vez de devolver uma resposta (pra testar o caminho de erro).
+    If `raise_error` is passed, create_message raises ProviderError
+    instead of returning a response (to test the error path).
     """
 
     name = "fake"
+    model = "fake-model"
 
     def __init__(self, responses=None, raise_error=None, name_override=None):
         self._responses = list(responses or [])
         self._raise_error = raise_error
-        self.calls = []  # cada chamada a create_message fica registrada aqui
+        self.calls = []  # every create_message call is recorded here
         if name_override is not None:
             self.name = name_override
 
@@ -38,7 +39,7 @@ class FakeProvider(Provider):
         if self._raise_error is not None:
             raise ProviderError(self._raise_error)
         if not self._responses:
-            raise AssertionError("FakeProvider ficou sem respostas programadas")
+            raise AssertionError("FakeProvider ran out of programmed responses")
         return self._responses.pop(0)
 
     def build_assistant_message(self, response: NormalizedResponse) -> dict:

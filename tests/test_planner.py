@@ -181,7 +181,7 @@ def test_plan_agent_with_empty_fixed_tools_tells_the_model_there_are_none():
 
     plan_agent("um agent qualquer", provider, fixed_tools=[])
 
-    assert "nenhuma" in provider.calls[0]["messages"][0]["text"].lower()
+    assert "none" in provider.calls[0]["messages"][0]["text"].lower()
 
 
 def test_plan_agent_without_fixed_tools_sends_the_description_untouched():

@@ -1,7 +1,7 @@
 from strine.tools import file_ops, http_request, send_email, slack, sql, web_search, webhook
 
-# requires_env: variáveis de ambiente sem as quais a tool não funciona.
-# O catálogo (strine describe / strine tools) usa isso pra avisar o que falta.
+# requires_env: environment variables without which the tool won't work.
+# The catalog (strine describe / strine tools) uses this to warn what's missing.
 TOOLS = {
     "sql": {
         "schema": sql.QUERY_DATABASE_SCHEMA,

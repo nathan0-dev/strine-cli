@@ -8,12 +8,12 @@ class MissingAPIKeyError(RuntimeError):
 
 
 def load_project_env() -> None:
-    """Carrega o .env do diretório onde o usuário RODOU o strine.
+    """Loads the .env from the directory where the user RAN strine.
 
-    usecwd=True: resolve o .env a partir do cwd, não de onde o pacote está
-    instalado — sem isso, um .env perto do código-fonte (ex: clone de
-    desenvolvimento) vazaria pra qualquer execução, em qualquer diretório.
-    override=True: o .env do projeto tem prioridade sobre uma variável já
-    exportada no shell (evita usar uma key antiga/errada silenciosamente).
+    usecwd=True: resolves .env starting from cwd, not from where the
+    package is installed — without this, a .env near the source code
+    (e.g. a dev checkout) would leak into any execution, in any directory.
+    override=True: the project's .env takes priority over a variable
+    already exported in the shell (avoids silently using an old/wrong key).
     """
     load_dotenv(find_dotenv(usecwd=True), override=True)

@@ -6,13 +6,13 @@ import requests
 
 SEND_EMAIL_SCHEMA = {
     "name": "send_email",
-    "description": "Envia um email.",
+    "description": "Sends an email.",
     "input_schema": {
         "type": "object",
         "properties": {
-            "to": {"type": "string", "description": "Endereço de email do destinatário."},
-            "subject": {"type": "string", "description": "Assunto do email."},
-            "body": {"type": "string", "description": "Corpo do email (texto simples)."},
+            "to": {"type": "string", "description": "Recipient's email address."},
+            "subject": {"type": "string", "description": "Email subject."},
+            "body": {"type": "string", "description": "Email body (plain text)."},
         },
         "required": ["to", "subject", "body"],
     },
@@ -25,8 +25,8 @@ def execute(to: str, subject: str, body: str) -> str:
     api_key = os.getenv("RESEND_API_KEY")
     if not api_key:
         return (
-            "Tool 'send_email' não configurada: defina RESEND_API_KEY no "
-            "seu .env pra habilitar o envio de emails."
+            "Tool 'send_email' not configured: set RESEND_API_KEY in your "
+            ".env to enable sending emails."
         )
 
     try:
@@ -42,9 +42,9 @@ def execute(to: str, subject: str, body: str) -> str:
             timeout=10,
         )
     except requests.RequestException as exc:
-        return f"Erro ao enviar email: {exc}"
+        return f"Error sending email: {exc}"
 
     if response.status_code >= 300:
-        return f"Resend retornou um erro (status {response.status_code}): {response.text}"
+        return f"Resend returned an error (status {response.status_code}): {response.text}"
 
-    return f"Email enviado com sucesso para {to}."
+    return f"Email sent successfully to {to}."

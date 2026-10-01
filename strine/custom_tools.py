@@ -4,41 +4,41 @@ from dataclasses import dataclass
 
 from strine.providers.base import Provider, ProviderError
 
-SYSTEM_PROMPT = """Você escreve uma tool Python customizada pra um agent de IA,
-a partir da descrição de um usuário.
+SYSTEM_PROMPT = """You write a custom Python tool for an AI agent, based
+on a user's description.
 
-Regras obrigatórias do código gerado:
-- Defina exatamente uma função chamada `execute` que recebe os parâmetros
-  descritos no seu próprio input_schema como keyword arguments e retorna
-  uma string.
-- Só pode importar a biblioteca padrão do Python ou o pacote `requests`.
-  Nenhum outro pacote de terceiros está disponível.
-- Nunca deixe uma exceção não tratada escapar de `execute` — capture erros
-  internamente (try/except) e retorne uma mensagem de erro como string,
-  igual o resto do código faria.
-- O código deve ser completo e correto, sem placeholders."""
+Mandatory rules for the generated code:
+- Define exactly one function called `execute` that receives the
+  parameters described in its own input_schema as keyword arguments and
+  returns a string.
+- You may only import Python's standard library or the `requests`
+  package. No other third-party package is available.
+- Never let an unhandled exception escape `execute` — catch errors
+  internally (try/except) and return an error message as a string, the
+  same way the rest of the code does.
+- The code must be complete and correct, with no placeholders."""
 
 CREATE_CUSTOM_TOOL_TOOL = {
     "name": "create_custom_tool",
-    "description": "Registra a tool customizada gerada: nome, descrição, schema de input e código Python.",
+    "description": "Registers the generated custom tool: name, description, input schema, and Python code.",
     "input_schema": {
         "type": "object",
         "properties": {
             "name": {
                 "type": "string",
-                "description": "Nome curto em formato slug (minúsculas, underscores), ex: parse_invoice_total.",
+                "description": "Short name in slug format (lowercase, underscores), e.g. parse_invoice_total.",
             },
             "description": {
                 "type": "string",
-                "description": "Descrição curta do que a tool faz, pro agent entender quando usá-la.",
+                "description": "Short description of what the tool does, so the agent knows when to use it.",
             },
             "input_schema": {
                 "type": "object",
-                "description": "JSON schema (formato input_schema da Anthropic) dos parâmetros que a tool recebe.",
+                "description": "JSON schema (Anthropic input_schema format) of the parameters the tool receives.",
             },
             "code": {
                 "type": "string",
-                "description": "Código Python completo definindo a função execute(**kwargs) -> str.",
+                "description": "Complete Python code defining the execute(**kwargs) -> str function.",
             },
         },
         "required": ["name", "description", "input_schema", "code"],
@@ -62,7 +62,7 @@ def _validate_code(code: str) -> None:
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
-        raise CustomToolError(f"O código gerado tem um erro de sintaxe: {exc}") from exc
+        raise CustomToolError(f"The generated code has a syntax error: {exc}") from exc
 
     has_execute = any(
         isinstance(node, ast.FunctionDef) and node.name == "execute"
@@ -70,7 +70,7 @@ def _validate_code(code: str) -> None:
     )
     if not has_execute:
         raise CustomToolError(
-            "O código gerado não define uma função 'execute'."
+            "The generated code does not define an 'execute' function."
         )
 
 
@@ -81,12 +81,12 @@ def _validate_name(name: str) -> None:
     Rejects names that could be used for path traversal attacks.
     """
     if not name:
-        raise CustomToolError("O nome da tool não pode estar vazio.")
+        raise CustomToolError("The tool name cannot be empty.")
 
     if not re.match(r"^[a-z0-9_-]+$", name):
         raise CustomToolError(
-            f"O nome da tool '{name}' é inválido. "
-            "Use apenas letras minúsculas, dígitos, underscores e hífens."
+            f"The tool name '{name}' is invalid. "
+            "Use only lowercase letters, digits, underscores, and hyphens."
         )
 
 
@@ -98,17 +98,17 @@ def _validate_input_schema(input_schema: dict) -> None:
     """
     if not isinstance(input_schema, dict):
         raise CustomToolError(
-            "O input_schema gerado é inválido: deve ser um objeto JSON."
+            "The generated input_schema is invalid: it must be a JSON object."
         )
 
     if input_schema.get("type") != "object":
         raise CustomToolError(
-            "O input_schema gerado é inválido: 'type' deve ser 'object'."
+            "The generated input_schema is invalid: 'type' must be 'object'."
         )
 
     if not isinstance(input_schema.get("properties"), dict):
         raise CustomToolError(
-            "O input_schema gerado é inválido: 'properties' deve ser um objeto."
+            "The generated input_schema is invalid: 'properties' must be an object."
         )
 
 
@@ -121,10 +121,10 @@ def generate_custom_tool(description: str, provider: Provider) -> CustomToolSpec
             force_tool="create_custom_tool",
         )
     except ProviderError as exc:
-        raise CustomToolError(f"Erro ao chamar a API: {exc}") from exc
+        raise CustomToolError(f"Error calling the API: {exc}") from exc
 
     if not response.tool_calls:
-        raise CustomToolError("O modelo não retornou uma tool customizada estruturada.")
+        raise CustomToolError("The model did not return a structured custom tool.")
 
     plan = response.tool_calls[0].input
     _validate_code(plan["code"])

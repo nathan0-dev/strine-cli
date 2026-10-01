@@ -53,5 +53,5 @@ def test_connection_error_returns_friendly_string():
     with patch("strine.tools.http_request.requests.request", side_effect=requests.RequestException("boom")):
         result = execute(method="GET", url="https://api.example.com/down")
 
-    assert "Erro" in result
+    assert "Error" in result
     assert "boom" in result

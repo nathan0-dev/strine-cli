@@ -15,49 +15,49 @@ VALID_TOOLS = {
     "file_write",
 }
 
-SYSTEM_PROMPT = """Você é um "agent architect". Dado o pedido de um usuário em
-linguagem natural, decida como montar um agent de IA:
+SYSTEM_PROMPT = """You are an "agent architect". Given a user's request in
+natural language, decide how to assemble an AI agent:
 
-1. Quais tools esse agent precisa, escolhendo apenas entre: "sql", "slack",
+1. Which tools this agent needs, choosing only from: "sql", "slack",
    "webhook", "http_request", "web_search", "send_email", "file_read",
-   "file_write". Se nenhuma for necessária, retorne uma lista vazia.
-2. Um system prompt claro e específico para o agent que vai ser criado,
-   descrevendo seu papel, escopo e como deve se comportar.
-3. Um nome curto e descritivo em formato slug (minúsculas, hífens, sem
-   espaços), ex: "sales-analyzer", "support-bot".
+   "file_write". Return an empty list if none are necessary.
+2. A clear, specific system prompt for the agent that will be created,
+   describing its role, scope, and how it should behave.
+3. A short, descriptive name in slug format (lowercase, hyphens, no
+   spaces), e.g. "sales-analyzer", "support-bot".
 
-Escolha uma tool apenas quando o pedido do usuário claramente precisar dela:
-- "sql": o agent precisa consultar um banco de dados.
-- "slack": o agent precisa postar mensagens no Slack.
-- "webhook": o agent precisa disparar uma chamada HTTP simples (POST com payload fixo).
-- "http_request": o agent precisa chamar uma API HTTP externa de forma mais flexível (qualquer método, headers, auth).
-- "web_search": o agent precisa pesquisar informação atual na internet.
-- "send_email": o agent precisa enviar emails.
-- "file_read": o agent precisa ler arquivos locais.
-- "file_write": o agent precisa escrever/salvar arquivos locais.
+Only choose a tool when the user's request clearly needs it:
+- "sql": the agent needs to query a database.
+- "slack": the agent needs to post messages to Slack.
+- "webhook": the agent needs to fire a simple HTTP call (POST with a fixed payload).
+- "http_request": the agent needs to call an external HTTP API more flexibly (any method, headers, auth).
+- "web_search": the agent needs to search for current information on the internet.
+- "send_email": the agent needs to send emails.
+- "file_read": the agent needs to read local files.
+- "file_write": the agent needs to write/save local files.
 
-Prefira "http_request" a "webhook" para integrações novas, a menos que o
-pedido seja literalmente só um POST simples. Não invente necessidade de
-tools que o usuário não pediu."""
+Prefer "http_request" over "webhook" for new integrations, unless the
+request is literally just a simple POST. Don't invent a need for tools
+the user didn't ask for."""
 
 AGENT_PLAN_TOOL = {
     "name": "create_agent_plan",
-    "description": "Registra o plano decidido para o agent: nome, system prompt e tools necessárias.",
+    "description": "Registers the decided plan for the agent: name, system prompt, and required tools.",
     "input_schema": {
         "type": "object",
         "properties": {
             "name": {
                 "type": "string",
-                "description": "Nome curto em formato slug (minúsculas, hífens), ex: sales-analyzer.",
+                "description": "Short name in slug format (lowercase, hyphens), e.g. sales-analyzer.",
             },
             "prompt": {
                 "type": "string",
-                "description": "System prompt completo para o agent que será criado.",
+                "description": "Complete system prompt for the agent that will be created.",
             },
             "tools": {
                 "type": "array",
                 "items": {"type": "string", "enum": sorted(VALID_TOOLS)},
-                "description": "Tools necessárias para esse agent. Lista vazia se nenhuma for necessária.",
+                "description": "Tools required for this agent. Empty list if none are necessary.",
             },
         },
         "required": ["name", "prompt", "tools"],
@@ -98,23 +98,23 @@ def _validate_name(name: str) -> None:
     needs the same protection against path traversal / unsafe characters.
     """
     if not name:
-        raise PlannerError("O nome do agent não pode estar vazio.")
+        raise PlannerError("The agent name cannot be empty.")
 
     if not re.match(r"^[a-z0-9_-]+$", name):
         raise PlannerError(
-            f"O nome do agent '{name}' é inválido. "
-            "Use apenas letras minúsculas, dígitos, underscores e hífens."
+            f"The agent name '{name}' is invalid. "
+            "Use only lowercase letters, digits, underscores, and hyphens."
         )
 
 
 def _describe_user_tool_choice(fixed_tools: List[str]) -> str:
-    listed = ", ".join(fixed_tools) if fixed_tools else "nenhuma"
+    listed = ", ".join(fixed_tools) if fixed_tools else "none"
     return (
-        "\n\n[Decisão do usuário: o agent deve usar EXATAMENTE estas tools: "
-        f"{listed}. Escreva o system prompt coerente com essa lista — se for "
-        "'nenhuma', o agent não tem ferramentas; se houver tools, o prompt "
-        "deve dizer que ele as usa quando precisar. Não mencione tools fora "
-        "da lista.]"
+        "\n\n[User decision: the agent must use EXACTLY these tools: "
+        f"{listed}. Write the system prompt to match this list — if it's "
+        "'none', the agent has no tools; if there are tools, the prompt "
+        "should say it uses them when needed. Don't mention tools outside "
+        "this list.]"
     )
 
 
@@ -123,16 +123,17 @@ def plan_agent(
     provider: Provider,
     fixed_tools: Optional[List[str]] = None,
 ) -> AgentConfig:
-    """Chama o provider pra decidir tools + system prompt + nome do agent.
+    """Calls the provider to decide tools + system prompt + agent name.
 
-    Usa tool use forçado (force_tool) em vez de pedir "responda em JSON" e
-    fazer parsing manual — o schema garante o formato da resposta.
+    Uses forced tool use (force_tool) instead of asking for "respond in
+    JSON" and parsing manually — the schema guarantees the response
+    format.
 
-    fixed_tools, se passado, é a decisão final do usuário (ex: depois de
-    ver o catálogo e trocar a sugestão): o modelo escreve o prompt já sabendo
-    dessas tools, e elas — não o que o modelo escolheria — vão pro resultado.
-    Sem isso o prompt poderia continuar dizendo "não use ferramentas" mesmo
-    depois do usuário ter adicionado uma.
+    fixed_tools, if passed, is the user's final decision (e.g. after
+    seeing the catalog and changing the suggestion): the model writes the
+    prompt already knowing these tools, and they — not whatever the model
+    would have chosen — go into the result. Without this the prompt could
+    keep saying "don't use tools" even after the user added one.
     """
     user_text = description
     if fixed_tools is not None:
@@ -146,10 +147,10 @@ def plan_agent(
             force_tool="create_agent_plan",
         )
     except ProviderError as exc:
-        raise PlannerError(f"Erro ao chamar a API: {exc}") from exc
+        raise PlannerError(f"Error calling the API: {exc}") from exc
 
     if not response.tool_calls:
-        raise PlannerError("O modelo não retornou um plano estruturado.")
+        raise PlannerError("The model did not return a structured plan.")
 
     plan = response.tool_calls[0].input
     chosen = plan.get("tools", []) if fixed_tools is None else fixed_tools

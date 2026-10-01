@@ -5,7 +5,7 @@ from strine.tool_catalog import missing_env_vars, parse_tool_selection, required
 VALID = {"sql", "web_search", "http_request", "file_read"}
 
 
-# --- credenciais ---
+# --- credentials ---
 
 
 def test_required_env_vars_for_tool_that_needs_a_credential():
@@ -76,17 +76,17 @@ def test_parse_reports_unknown_names_separately():
     assert invalid == ["bogus", "nope"]
 
 
-def test_parse_nenhuma_means_an_empty_selection():
-    assert parse_tool_selection("nenhuma", VALID) == ([], [])
-    assert parse_tool_selection("  Nenhuma  ", VALID) == ([], [])
+def test_parse_none_means_an_empty_selection():
+    assert parse_tool_selection("none", VALID) == ([], [])
+    assert parse_tool_selection("  None  ", VALID) == ([], [])
 
 
-def test_parse_nenhuma_mixed_with_names_is_treated_as_an_unknown_name():
-    """'nenhuma, sql' é ambíguo — melhor apontar do que adivinhar."""
-    selected, invalid = parse_tool_selection("nenhuma, sql", VALID)
+def test_parse_none_mixed_with_names_is_treated_as_an_unknown_name():
+    """'none, sql' is ambiguous — better to flag it than guess."""
+    selected, invalid = parse_tool_selection("none, sql", VALID)
 
     assert selected == ["sql"]
-    assert invalid == ["nenhuma"]
+    assert invalid == ["none"]
 
 
 @pytest.mark.parametrize("raw", ["", "   ", ",,", " , "])

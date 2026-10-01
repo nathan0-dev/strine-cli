@@ -252,8 +252,8 @@ def test_describe_shows_the_whole_tool_catalog_before_asking_about_custom_tools(
     assert result.exit_code == 0
     for key in _ALL_TOOL_KEYS:
         assert key in result.output
-    # o catálogo aparece antes da pergunta de tool customizada
-    assert result.output.index("file_write") < result.output.index("Nenhuma dessas serve")
+    # the catalog appears before the custom-tool question
+    assert result.output.index("file_write") < result.output.index("None of these fit")
 
 
 def test_describe_enter_keeps_the_planners_suggestion_without_replanning():
@@ -278,8 +278,8 @@ def test_describe_lets_the_user_remove_a_tool():
     assert saved["tools"] == ["http_request"]
 
 
-def test_describe_nenhuma_clears_every_tool():
-    result, saved, _ = _invoke_describe("nenhuma\n\n", suggested=("sql",))
+def test_describe_none_clears_every_tool():
+    result, saved, _ = _invoke_describe("none\n\n", suggested=("sql",))
 
     assert result.exit_code == 0
     assert saved["tools"] == []

@@ -6,17 +6,17 @@ import requests
 
 POST_TO_SLACK_SCHEMA = {
     "name": "post_to_slack",
-    "description": "Posta uma mensagem em um canal do Slack.",
+    "description": "Posts a message to a Slack channel.",
     "input_schema": {
         "type": "object",
         "properties": {
             "channel": {
                 "type": "string",
-                "description": "Canal do Slack onde a mensagem será postada, ex: #vendas.",
+                "description": "Slack channel where the message will be posted, e.g. #sales.",
             },
             "message": {
                 "type": "string",
-                "description": "Conteúdo da mensagem a ser postada.",
+                "description": "Content of the message to post.",
             },
         },
         "required": ["channel", "message"],
@@ -28,8 +28,8 @@ def execute(channel: str, message: str) -> str:
     token = os.getenv("SLACK_BOT_TOKEN")
     if not token:
         return (
-            "Tool 'slack' não configurada: defina SLACK_BOT_TOKEN no seu .env "
-            "pra habilitar o envio de mensagens ao Slack."
+            "Tool 'slack' not configured: set SLACK_BOT_TOKEN in your .env "
+            "to enable sending messages to Slack."
         )
 
     try:
@@ -41,9 +41,9 @@ def execute(channel: str, message: str) -> str:
         )
         data = response.json()
     except requests.RequestException as exc:
-        return f"Erro ao conectar com o Slack: {exc}"
+        return f"Error connecting to Slack: {exc}"
 
     if not data.get("ok"):
-        return f"Slack retornou um erro: {data.get('error', 'desconhecido')}"
+        return f"Slack returned an error: {data.get('error', 'unknown')}"
 
-    return f"Mensagem postada em {channel} com sucesso."
+    return f"Message posted to {channel} successfully."

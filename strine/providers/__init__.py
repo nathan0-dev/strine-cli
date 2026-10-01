@@ -35,16 +35,15 @@ class UnknownProviderError(RuntimeError):
 
 
 def get_provider(name: str, model: Optional[str] = None) -> Provider:
-    """Instancia o provider certo, já com a API key carregada do .env.
+    """Instantiates the right provider, already loaded with the API key from .env.
 
-    model, se passado, sobrescreve o modelo padrão daquele provider —
-    essencial pro OpenRouter, que roteia pra centenas de modelos.
-
+    model, if passed, overrides that provider's default model — essential
+    for OpenRouter, which routes to hundreds of models.
     """
     if name not in PROVIDERS:
         valid = ", ".join(sorted(PROVIDERS))
         raise UnknownProviderError(
-            f"Provider '{name}' não é reconhecido. Providers disponíveis: {valid}."
+            f"Provider '{name}' is not recognized. Available providers: {valid}."
         )
 
     load_project_env()
@@ -53,11 +52,11 @@ def get_provider(name: str, model: Optional[str] = None) -> Provider:
     api_key = os.getenv(env_var)
     if not api_key:
         raise MissingAPIKeyError(
-            f"{env_var} não configurada.\n\n"
-            f"Configure sua chave da API antes de usar o provider '{name}':\n"
-            f"  1. Copie .env.example para .env:  cp .env.example .env\n"
-            f"  2. Edite .env e adicione:          {env_var}=...\n"
-            f"  3. Ou exporte diretamente:          export {env_var}=...\n"
+            f"{env_var} is not configured.\n\n"
+            f"Configure your API key before using the '{name}' provider:\n"
+            f"  1. Copy .env.example to .env:  cp .env.example .env\n"
+            f"  2. Edit .env and add:          {env_var}=...\n"
+            f"  3. Or export it directly:      export {env_var}=...\n"
         )
 
     provider_cls = PROVIDERS[name]

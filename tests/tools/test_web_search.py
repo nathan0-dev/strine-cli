@@ -37,7 +37,7 @@ def test_request_exception_returns_friendly_message(monkeypatch):
     with patch("strine.tools.web_search.requests.post", side_effect=requests.RequestException("timeout")):
         result = execute(query="strine cli")
 
-    assert "Erro" in result
+    assert "Error" in result
     assert "timeout" in result
 
 

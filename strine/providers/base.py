@@ -18,19 +18,19 @@ class NormalizedResponse:
 
 
 class ProviderError(RuntimeError):
-    """Erro de chamada de API, independente de qual provider está por trás."""
+    """API call error, independent of which provider is behind it."""
 
 
 class Provider(ABC):
     name: str
-    # Modelo efetivamente em uso (o padrão do provider, ou o que veio pelo
-    # --model). É público porque o agent.json grava esse valor resolvido,
-    # deixando o agent reproduzível mesmo que o padrão mude depois.
+    # Model actually in use (the provider's default, or what came via
+    # --model). Public because agent.json stores this resolved value,
+    # keeping a saved agent reproducible even if the default changes later.
     model: str
 
     @abstractmethod
     def build_user_message(self, text: str) -> Any:
-        """Monta a primeira mensagem (turno do usuário) no formato nativo do provider."""
+        """Builds the first message (user turn) in the provider's native format."""
 
     @abstractmethod
     def create_message(
@@ -40,23 +40,23 @@ class Provider(ABC):
         tools: Optional[list] = None,
         force_tool: Optional[str] = None,
     ) -> NormalizedResponse:
-        """Faz uma chamada de API. tools usa o schema genérico
-        {"name", "description", "input_schema"}. force_tool, se passado,
-        força a chamada daquela tool específica. Deve capturar o erro
-        nativo da SDK e levantar ProviderError."""
+        """Makes an API call. tools uses the generic schema
+        {"name", "description", "input_schema"}. force_tool, if passed,
+        forces that specific tool to be called. Must catch the SDK's
+        native error and raise ProviderError."""
 
     @abstractmethod
     def build_assistant_message(self, response: NormalizedResponse) -> Any:
-        """Monta o turno 'assistant' (com os tool_calls pedidos) no formato
-        nativo do provider, pra ser anexado ao histórico."""
+        """Builds the 'assistant' turn (with the requested tool_calls) in
+        the provider's native format, to be appended to the history."""
 
     @abstractmethod
     def build_tool_result_messages(self, tool_results: list) -> List[Any]:
-        """tool_results: lista de {"tool_call_id": str, "name": str,
-        "content": str}. Monta o(s) turno(s) de resultado de tool no
-        formato nativo do provider.
+        """tool_results: list of {"tool_call_id": str, "name": str,
+        "content": str}. Builds the tool-result turn(s) in the provider's
+        native format.
 
-        Retorna uma LISTA porque os formatos divergem: Claude e Gemini
-        agrupam todos os resultados num único turno, enquanto o formato
-        OpenAI exige uma mensagem {"role": "tool"} separada por
-        resultado. Quem chama faz extend(), não append()."""
+        Returns a LIST because formats diverge: Claude and Gemini group
+        all results into a single turn, while the OpenAI format requires
+        a separate {"role": "tool"} message per result. Callers extend(),
+        not append()."""

@@ -6,13 +6,13 @@ import requests
 
 WEB_SEARCH_SCHEMA = {
     "name": "web_search",
-    "description": "Pesquisa informação atual na web e retorna os resultados mais relevantes.",
+    "description": "Searches the web for current information and returns the most relevant results.",
     "input_schema": {
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Termo ou pergunta a ser pesquisada.",
+                "description": "Term or question to search for.",
             },
         },
         "required": ["query"],
@@ -24,8 +24,8 @@ def execute(query: str) -> str:
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
         return (
-            "Tool 'web_search' não configurada: defina TAVILY_API_KEY no "
-            "seu .env pra habilitar busca na web."
+            "Tool 'web_search' not configured: set TAVILY_API_KEY in your "
+            ".env to enable web search."
         )
 
     try:
@@ -35,15 +35,15 @@ def execute(query: str) -> str:
             timeout=10,
         )
     except requests.RequestException as exc:
-        return f"Erro ao pesquisar na web: {exc}"
+        return f"Error searching the web: {exc}"
 
     if response.status_code >= 400:
-        return f"Tavily retornou um erro (status {response.status_code}): {response.text}"
+        return f"Tavily returned an error (status {response.status_code}): {response.text}"
 
     data = response.json()
     results = data.get("results", [])
     if not results:
-        return "Nenhum resultado encontrado."
+        return "No results found."
 
     lines = []
     for i, item in enumerate(results, start=1):

@@ -44,7 +44,7 @@ class ClaudeProvider(Provider):
         try:
             response = self._client.messages.create(**kwargs)
         except anthropic.APIError as exc:
-            raise ProviderError(f"Erro ao chamar a API da Anthropic: {exc}") from exc
+            raise ProviderError(f"Error calling the Anthropic API: {exc}") from exc
 
         tool_calls = [
             ToolCall(id=block.id, name=block.name, input=block.input)
@@ -69,7 +69,7 @@ class ClaudeProvider(Provider):
         return {"role": "assistant", "content": content}
 
     def build_tool_result_messages(self, tool_results: list) -> list:
-        # Claude agrupa todos os resultados num único turno 'user'.
+        # Claude groups all results into a single 'user' turn.
         return [
             {
                 "role": "user",

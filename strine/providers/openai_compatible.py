@@ -7,13 +7,14 @@ from strine.providers.base import NormalizedResponse, Provider, ProviderError, T
 
 
 class OpenAICompatibleProvider(Provider):
-    """Base pros providers que falam o formato de function calling da OpenAI.
+    """Base for providers that speak OpenAI's function-calling format.
 
-    GPT, Groq e OpenRouter usam exatamente a mesma API (Chat Completions) —
-    só mudam a base_url e a API key. Por isso um adapter só atende os três:
-    cada subclasse define apenas `name`, `base_url` e `default_model`.
+    GPT, Groq, and OpenRouter all use exactly the same API (Chat
+    Completions) — only the base_url and API key differ. So one adapter
+    serves all three: each subclass just sets `name`, `base_url`, and
+    `default_model`.
 
-    base_url None significa "usa o endpoint padrão da própria OpenAI".
+    base_url None means "use OpenAI's own default endpoint".
     """
 
     base_url: Optional[str] = None
@@ -33,9 +34,9 @@ class OpenAICompatibleProvider(Provider):
         tools: Optional[list] = None,
         force_tool: Optional[str] = None,
     ) -> NormalizedResponse:
-        # No formato OpenAI o system prompt é a primeira mensagem do
-        # histórico (diferente de Anthropic/Gemini, que têm campo próprio).
-        # Monta uma lista nova pra não poluir o histórico do chamador.
+        # In the OpenAI format the system prompt is the first message in
+        # the history (unlike Anthropic/Gemini, which have a dedicated
+        # field). Build a new list so we don't pollute the caller's history.
         full_messages = [{"role": "system", "content": system_prompt}, *messages]
 
         kwargs = {"model": self.model, "messages": full_messages}
@@ -62,12 +63,12 @@ class OpenAICompatibleProvider(Provider):
         try:
             response = self._client.chat.completions.create(**kwargs)
         except openai.APIError as exc:
-            raise ProviderError(f"Erro ao chamar a API de {self.name}: {exc}") from exc
+            raise ProviderError(f"Error calling the {self.name} API: {exc}") from exc
 
         if not response.choices:
             raise ProviderError(
-                f"A API de {self.name} não retornou nenhuma resposta "
-                "(a requisição pode ter sido filtrada)."
+                f"The {self.name} API did not return any response "
+                "(the request may have been filtered)."
             )
 
         message = response.choices[0].message
@@ -79,7 +80,7 @@ class OpenAICompatibleProvider(Provider):
                 arguments = json.loads(raw_arguments) if raw_arguments else {}
             except json.JSONDecodeError as exc:
                 raise ProviderError(
-                    f"A API de {self.name} retornou argumentos inválidos para a "
+                    f"The {self.name} API returned invalid arguments for "
                     f"tool '{call.function.name}': {exc}"
                 ) from exc
             tool_calls.append(
@@ -101,7 +102,7 @@ class OpenAICompatibleProvider(Provider):
                     "type": "function",
                     "function": {
                         "name": call.name,
-                        # a API espera os argumentos como string JSON
+                        # the API expects arguments as a JSON string
                         "arguments": json.dumps(call.input),
                     },
                 }
@@ -110,8 +111,8 @@ class OpenAICompatibleProvider(Provider):
         return message
 
     def build_tool_result_messages(self, tool_results: list) -> list:
-        # O formato OpenAI exige uma mensagem separada por resultado,
-        # ligada à chamada original pelo tool_call_id.
+        # The OpenAI format requires a separate message per result, linked
+        # to the original call via tool_call_id.
         return [
             {
                 "role": "tool",
@@ -137,6 +138,6 @@ class GroqProvider(OpenAICompatibleProvider):
 class OpenRouterProvider(OpenAICompatibleProvider):
     name = "openrouter"
     base_url = "https://openrouter.ai/api/v1"
-    # O OpenRouter roteia pra centenas de modelos — esse default é só um
-    # ponto de partida sensato; use --model pra escolher qualquer outro.
+    # OpenRouter routes to hundreds of models — this default is just a
+    # sensible starting point; use --model to pick any other.
     default_model = "openai/gpt-6-sol"

@@ -15,9 +15,9 @@ class GeminiProvider(Provider):
     def __init__(self, api_key: str, model: Optional[str] = None):
         self._client = genai.Client(api_key=api_key)
         self.model = model or DEFAULT_GEMINI_MODEL
-        # Ids que a Gemini API não populou em FunctionCall.id e que nós
-        # inventamos só pra correlação interna (runtime.py). Nunca devem
-        # ser reenviados pra API como se fossem ids nativos dela.
+        # Ids the Gemini API did not populate on FunctionCall.id, which we
+        # invent only for internal correlation (runtime.py). These must
+        # never be sent back to the API as if they were its own native ids.
         self._synthetic_tool_call_ids: set = set()
 
     def build_user_message(self, text: str) -> types.Content:
@@ -58,12 +58,12 @@ class GeminiProvider(Provider):
                 config=types.GenerateContentConfig(**config_kwargs),
             )
         except genai_errors.APIError as exc:
-            raise ProviderError(f"Erro ao chamar a API do Gemini: {exc}") from exc
+            raise ProviderError(f"Error calling the Gemini API: {exc}") from exc
 
         if not response.candidates or response.candidates[0].content is None:
             raise ProviderError(
-                "O Gemini não retornou conteúdo — a resposta pode ter sido "
-                "bloqueada por filtros de segurança."
+                "Gemini did not return any content — the response may have "
+                "been blocked by safety filters."
             )
 
         parts = response.candidates[0].content.parts or []
@@ -110,7 +110,7 @@ class GeminiProvider(Provider):
         return types.Content(role="model", parts=parts)
 
     def build_tool_result_messages(self, tool_results: list) -> list:
-        # Gemini agrupa todos os function_response num único Content.
+        # Gemini groups all function_response entries into a single Content.
         parts = []
         for result in tool_results:
             call_id = result["tool_call_id"]

@@ -13,12 +13,12 @@ class AgentRuntimeError(RuntimeError):
 
 
 def prepare_agent_tools(agent_config: dict):
-    """Monta os schemas de tools + mapa nome->execute pra um agent.
+    """Builds the tool schemas + name->execute map for an agent.
 
-    Combina as tools pré-construídas (via registry central) com as tools
-    customizadas do agent (import dinâmico do arquivo .py salvo na criação).
-    Nunca falha a chamada inteira por causa de uma tool problemática — só
-    registra um warning e segue sem ela.
+    Combines the built-in tools (via the central registry) with the
+    agent's custom tools (dynamic import of the .py file saved at
+    creation time). Never fails the whole call because of one broken
+    tool — it just logs a warning and continues without it.
     """
     tool_schemas = []
     executors = {}
@@ -27,7 +27,7 @@ def prepare_agent_tools(agent_config: dict):
     for name in agent_config.get("tools", []):
         entry = TOOLS.get(name)
         if entry is None:
-            warnings.append(f"Tool '{name}' não é reconhecida, ignorando.")
+            warnings.append(f"Tool '{name}' is not recognized, skipping.")
             continue
         schema = entry["schema"]
         tool_schemas.append(schema)
@@ -39,18 +39,18 @@ def prepare_agent_tools(agent_config: dict):
 
         try:
             if not module_path or not Path(module_path).is_file():
-                raise FileNotFoundError(f"arquivo não encontrado: {module_path}")
+                raise FileNotFoundError(f"file not found: {module_path}")
 
             spec = importlib.util.spec_from_file_location(f"custom_tool_{name}", module_path)
             if spec is None or spec.loader is None:
-                raise ImportError(f"não foi possível carregar o módulo em {module_path}")
+                raise ImportError(f"could not load the module at {module_path}")
 
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             execute_fn = module.execute
         except Exception as exc:
             warnings.append(
-                f"Tool customizada '{name}' não pôde ser carregada ({exc}). Ignorando."
+                f"Custom tool '{name}' could not be loaded ({exc}). Skipping."
             )
             continue
 
@@ -74,23 +74,23 @@ def run_agent(
     provider: Provider,
     on_tool_call: Optional[Callable[[str], None]] = None,
 ) -> str:
-    """Roda uma pergunta do usuário contra o agent, executando tools de verdade.
+    """Runs a user's question against the agent, executing real tools.
 
-    Cada chamada é uma conversa nova (sem memória entre perguntas do REPL).
-    Se o modelo pedir uma tool, ela é executada e o resultado volta pra
-    ele, num loop limitado a MAX_TOOL_ROUNDS idas-e-voltas, pra nunca
-    rodar indefinidamente.
+    Each call is a fresh conversation (no memory across REPL questions).
+    If the model requests a tool, it gets executed and the result goes
+    back to it, in a loop capped at MAX_TOOL_ROUNDS round-trips so it
+    never runs indefinitely.
 
-    on_tool_call, se passado, é chamado com o nome da tool logo antes dela
-    ser executada — permite ao chamador (cli.py) mostrar feedback visual
-    sem que esse módulo precise fazer I/O diretamente.
+    on_tool_call, if passed, is called with the tool's name right before
+    it runs — lets the caller (cli.py) show visual feedback without this
+    module doing I/O directly.
     """
     messages = [provider.build_user_message(user_input)]
 
     try:
         response = provider.create_message(system_prompt, messages, tools=tool_schemas)
     except ProviderError as exc:
-        raise AgentRuntimeError(f"Erro ao chamar a API: {exc}") from exc
+        raise AgentRuntimeError(f"Error calling the API: {exc}") from exc
 
     rounds = 0
     while response.stop_reason == "tool_use" and rounds < MAX_TOOL_ROUNDS:
@@ -100,14 +100,14 @@ def run_agent(
         for call in response.tool_calls:
             executor = executors.get(call.name)
             if executor is None:
-                result_text = f"Tool '{call.name}' não está disponível."
+                result_text = f"Tool '{call.name}' is not available."
             else:
                 if on_tool_call is not None:
                     on_tool_call(call.name)
                 try:
                     result_text = executor(**call.input)
                 except Exception as exc:
-                    result_text = f"Erro ao executar a tool '{call.name}': {exc}"
+                    result_text = f"Error executing tool '{call.name}': {exc}"
 
             tool_results.append(
                 {"tool_call_id": call.id, "name": call.name, "content": result_text}
@@ -119,14 +119,14 @@ def run_agent(
         try:
             response = provider.create_message(system_prompt, messages, tools=tool_schemas)
         except ProviderError as exc:
-            raise AgentRuntimeError(f"Erro ao chamar a API: {exc}") from exc
+            raise AgentRuntimeError(f"Error calling the API: {exc}") from exc
 
     final_text = response.text
 
     if response.stop_reason == "tool_use" and rounds >= MAX_TOOL_ROUNDS:
         note = (
-            "(O agent atingiu o limite de chamadas de tools nesta pergunta; "
-            "a resposta pode estar incompleta.)"
+            "(The agent hit the tool-call limit for this question; the "
+            "response may be incomplete.)"
         )
         final_text = f"{final_text}\n\n{note}" if final_text else note
 

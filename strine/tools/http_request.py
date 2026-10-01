@@ -5,9 +5,9 @@ import requests
 HTTP_REQUEST_SCHEMA = {
     "name": "http_request",
     "description": (
-        "Faz uma chamada HTTP genérica (GET, POST, PUT, PATCH ou DELETE) "
-        "para qualquer URL externa, com headers e corpo opcionais. Use "
-        "isso para integrar com qualquer API REST."
+        "Makes a generic HTTP call (GET, POST, PUT, PATCH, or DELETE) to "
+        "any external URL, with optional headers and body. Use this to "
+        "integrate with any REST API."
     ),
     "input_schema": {
         "type": "object",
@@ -15,19 +15,19 @@ HTTP_REQUEST_SCHEMA = {
             "method": {
                 "type": "string",
                 "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"],
-                "description": "Método HTTP da requisição.",
+                "description": "HTTP method for the request.",
             },
             "url": {
                 "type": "string",
-                "description": "URL de destino da requisição.",
+                "description": "Destination URL for the request.",
             },
             "headers": {
                 "type": "object",
-                "description": "Headers HTTP opcionais, ex: Authorization.",
+                "description": "Optional HTTP headers, e.g. Authorization.",
             },
             "body": {
                 "type": "object",
-                "description": "Corpo JSON opcional da requisição.",
+                "description": "Optional JSON body for the request.",
             },
         },
         "required": ["method", "url"],
@@ -45,10 +45,10 @@ def execute(
             method, url, headers=headers, json=body, timeout=10
         )
     except requests.RequestException as exc:
-        return f"Erro ao fazer a requisição HTTP: {exc}"
+        return f"Error making the HTTP request: {exc}"
 
     text = response.text
     if len(text) > _MAX_RESPONSE_CHARS:
-        text = text[:_MAX_RESPONSE_CHARS] + "... (truncado)"
+        text = text[:_MAX_RESPONSE_CHARS] + "... (truncated)"
 
-    return f"Status: {response.status_code}\nCorpo: {text}"
+    return f"Status: {response.status_code}\nBody: {text}"
