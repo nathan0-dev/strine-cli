@@ -18,6 +18,7 @@
 No config files. No dashboard. No framework to learn.
 Works with **Claude, GPT, Gemini, Groq and OpenRouter**.
 
+[![CI](https://github.com/nathan0-dev/strine-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/nathan0-dev/strine-cli/actions/workflows/ci.yml)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-7aa2f7?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-9ece6a?style=flat-square)](LICENSE)
 [![Providers](https://img.shields.io/badge/providers-Claude%20%C2%B7%20GPT%20%C2%B7%20Gemini%20%C2%B7%20Groq%20%C2%B7%20OpenRouter-bb9af7?style=flat-square)](#-supported-providers)
@@ -29,17 +30,9 @@ Works with **Claude, GPT, Gemini, Groq and OpenRouter**.
 
 ---
 
-```console
-$ strine "an agent that researches bug bounty programs and saves notes to markdown" --provider groq
-```
-
-```console
-$ strine run ./bugbounty-assistant.json
-```
-
 <div align="center">
 
-<img src="assets/strine-run.svg" alt="Strine running a bug bounty research agent: it calls web_search and file_write, then answers in the terminal" width="860">
+<img src="assets/strine-demo.gif" alt="Demo: creating a research agent with one sentence, then running it — it calls web_search and file_write and answers in the terminal" width="860">
 
 </div>
 
