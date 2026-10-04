@@ -19,7 +19,7 @@ No config files. No dashboard. No framework to learn.
 Works with **Claude, GPT, Gemini, Groq and OpenRouter**.
 
 [![CI](https://github.com/nathan0-dev/strine-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/nathan0-dev/strine-cli/actions/workflows/ci.yml)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-7aa2f7?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-7aa2f7?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-9ece6a?style=flat-square)](LICENSE)
 [![Providers](https://img.shields.io/badge/providers-Claude%20%C2%B7%20GPT%20%C2%B7%20Gemini%20%C2%B7%20Groq%20%C2%B7%20OpenRouter-bb9af7?style=flat-square)](#-supported-providers)
 [![Stars](https://img.shields.io/github/stars/nathan0-dev/strine-cli?style=flat-square&color=e0af68)](https://github.com/nathan0-dev/strine-cli/stargazers)

@@ -7,7 +7,7 @@ name = "strine"
 version = "0.1.0"
 description = "Describe your agent. Get it running. No config, no dashboard."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["ai-agent", "llm", "cli", "tool-calling", "function-calling", "claude", "gpt", "gemini", "groq", "openrouter", "agent-builder"]
 classifiers = [
